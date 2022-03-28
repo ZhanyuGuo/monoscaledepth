@@ -146,6 +146,7 @@ def rot_from_axisangle(vec):
     (adapted from https://github.com/Wallacoloo/printipi)
     Input 'vec' has to be Bx1x3
     """
+
     angle = torch.norm(vec, 2, 2, True)
     axis = vec / (angle + 1e-7)
 
@@ -185,6 +186,7 @@ def rot_from_axisangle(vec):
 
 def get_translation_matrix(translation_vector):
     """Convert a translation vector into a 4x4 transformation matrix"""
+
     T = torch.zeros(translation_vector.shape[0], 4, 4).to(
         device=translation_vector.device
     )
@@ -237,6 +239,7 @@ def get_smooth_loss(disp, img):
     """Computes the smoothness loss for a disparity image
     The color image is used for edge-aware smoothness
     """
+
     grad_disp_x = torch.abs(disp[:, :, :, :-1] - disp[:, :, :, 1:])
     grad_disp_y = torch.abs(disp[:, :, :-1, :] - disp[:, :, 1:, :])
 
@@ -255,4 +258,5 @@ def get_smooth_loss(disp, img):
 
 def upsample(x):
     """Upsample input tensor by a factor of 2"""
+
     return F.interpolate(x, scale_factor=2, mode="nearest")

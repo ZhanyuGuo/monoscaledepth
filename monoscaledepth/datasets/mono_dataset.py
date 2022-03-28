@@ -21,6 +21,7 @@ from torchvision import transforms
 
 cv2.setNumThreads(0)
 
+
 def pil_loader(path):
     # open path as file to avoid ResourceWarning
     # (https://github.com/python-pillow/Pillow/issues/835)
@@ -81,7 +82,7 @@ class MonoDataset(data.Dataset):
             self.resize[i] = transforms.Resize(
                 (self.height // s, self.width // s), interpolation=self.interp
             )
-    
+
         self.load_depth = self.check_depth()
 
     def preprocess(self, inputs, color_aug):
@@ -96,7 +97,7 @@ class MonoDataset(data.Dataset):
                 n, im, i = k
                 for i in range(self.num_scales):
                     inputs[(n, im, i)] = self.resize[i](inputs[(n, im, i - 1)])
-        
+
         for k in list(inputs):
             f = inputs[k]
             if "color" in k:
@@ -140,10 +141,35 @@ class MonoDataset(data.Dataset):
         folder, frame_index, side = self.index_to_folder_and_frame_idx(index)
 
         poses = {}
-        if type(self).__name__ in ["KITTIRawPoseDataset",]:
+        if type(self).__name__ in [
+            "KITTIRawPoseDataset",
+        ]:
             inputs.update(self.get_colors(folder, frame_index, side, do_flip))
         else:
-            raise NotImplementedError
+            for i in self.frame_idxs:
+                if i == "s":
+                    other_side = {"r": "l", "l": "r"}[side]
+                    inputs[("color", i, -1)] = self.get_color(
+                        folder, frame_index, other_side, do_flip
+                    )
+                else:
+                    try:
+                        inputs[("color", i, -1)] = self.get_color(
+                            folder, frame_index + i, side, do_flip
+                        )
+                    except FileNotFoundError as e:
+                        if i != 0:
+                            # fill with dummy values
+                            inputs[("color", i, -1)] = Image.fromarray(
+                                np.zeros((100, 100, 3)).astype(np.uint8)
+                            )
+                            poses[i] = None
+                        else:
+                            raise FileNotFoundError(
+                                f"Cannot find frame - make sure your "
+                                f"--data_path is set correctly, or try adding"
+                                f" the --png flag. {e}"
+                            )
 
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):
@@ -156,20 +182,20 @@ class MonoDataset(data.Dataset):
 
             inputs[("K", scale)] = torch.from_numpy(K)
             inputs[("inv_K", scale)] = torch.from_numpy(inv_K)
-        
+
         if do_color_aug:
             color_aug = transforms.ColorJitter.get_params(
                 self.brightness, self.contrast, self.saturation, self.hue
             )
         else:
             color_aug = lambda x: x
-        
+
         self.preprocess(inputs, color_aug)
 
         for i in self.frame_idxs:
             del inputs[("color", i, -1)]
             del inputs[("color_aug", i, -1)]
-        
+
         return inputs
 
     def load_intrinsics(self, folder, frame_index):

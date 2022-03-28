@@ -17,7 +17,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 import torch.utils.model_zoo as model_zoo
-# from monoscaledepth.layers import BackprojectDepth, Project3D
 
 
 class ResNetMultiImageInput(models.ResNet):
@@ -28,9 +27,7 @@ class ResNetMultiImageInput(models.ResNet):
     def __init__(self, block, layers, num_classes=1000, num_input_images=1):
         super(ResNetMultiImageInput, self).__init__(block, layers)
         self.inplanes = 64
-        self.conv1 = nn.Conv2d(
-            num_input_images * 3, 64, kernel_size=7, stride=2, padding=3, bias=False
-        )
+        self.conv1 = nn.Conv2d(num_input_images * 3, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -58,7 +55,7 @@ def resnet_multiimage_input(num_layers, pretrained=False, num_input_images=1):
     blocks = {18: [2, 2, 2, 2], 50: [3, 4, 6, 3]}[num_layers]
     block_type = {18: models.resnet.BasicBlock, 50: models.resnet.Bottleneck}[num_layers]
     model = ResNetMultiImageInput(block_type, blocks, num_input_images=num_input_images)
-    
+
     if pretrained:
         loaded = model_zoo.load_url(
             models.resnet.model_urls["resnet{}".format(num_layers)]
@@ -90,7 +87,7 @@ class ResnetEncoder(nn.Module):
             raise ValueError(
                 "{} is not a valid number of resnet layers".format(num_layers)
             )
-        
+
         if num_input_images > 1:
             self.encoder = resnet_multiimage_input(
                 num_layers, pretrained, num_input_images
@@ -100,7 +97,7 @@ class ResnetEncoder(nn.Module):
 
         if num_layers > 34:
             self.num_ch_enc[1:] *= 4
-    
+
     def forward(self, input_image):
         self.features = []
         x = (input_image - 0.45) / 0.225

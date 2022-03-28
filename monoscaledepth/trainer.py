@@ -258,35 +258,78 @@ class Trainer:
 
         return mono_outputs, mono_losses
 
-    def compute_reprojection_loss(self, pred, target):
-        """Computes reprojection loss between a batch of predicted and target images"""
+    def predict_poses(self, inputs):
+        """Predict poses between input frames for monocular sequences."""
 
-        abs_diff = torch.abs(target - pred)
-        l1_loss = abs_diff.mean(1, True)
+        outputs = {}
+        if self.num_pose_frames == 2:
+            # In this setting, we compute the pose to each source frame via a
+            # separate forward pass through the pose network.
 
-        ssim_loss = self.ssim(pred, target).mean(1, True)
-        reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
+            # predict poses for reprojection loss
+            # select what features the pose network takes as input
+            pose_feats = {
+                f_i: inputs["color_aug", f_i, 0] for f_i in self.opt.frame_ids
+            }
+            for f_i in self.opt.frame_ids[1:]:
+                # To maintain ordering we always pass frames in temporal order
+                if f_i < 0:
+                    pose_inputs = [pose_feats[f_i], pose_feats[0]]
+                else:
+                    pose_inputs = [pose_feats[0], pose_feats[f_i]]
 
-        return reprojection_loss
+                pose_inputs = [self.models["pose_encoder"](torch.cat(pose_inputs, 1))]
 
-    @staticmethod
-    def compute_loss_masks(reprojection_loss, identity_reprojection_loss):
-        """Compute loss masks for each of standard reprojection and depth hint
-        reprojection"""
+                axisangle, translation = self.models["pose"](pose_inputs)
+                outputs[("axisangle", 0, f_i)] = axisangle
+                outputs[("translation", 0, f_i)] = translation
 
-        if identity_reprojection_loss is None:
-            # we are not using automasking - standard reprojection loss applied to all pixels
-            reprojection_loss_mask = torch.ones_like(reprojection_loss)
-
+                # Invert the matrix if the frame id is negative
+                outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
+                    axisangle[:, 0], translation[:, 0], invert=(f_i < 0)
+                )
         else:
-            # we are using automasking
-            all_losses = torch.cat(
-                [reprojection_loss, identity_reprojection_loss], dim=1
-            )
-            idxs = torch.argmin(all_losses, dim=1, keepdim=True)
-            reprojection_loss_mask = (idxs == 0).float()
+            raise NotImplementedError
 
-        return reprojection_loss_mask
+        return outputs
+
+    def generate_images_pred(self, inputs, outputs, is_multi=False):
+        """Generate the warped (reprojected) color images for a minibatch.
+        Generated images are saved into the `outputs` dictionary.
+        """
+
+        for scale in self.opt.scales:
+            disp = outputs[("disp", scale)]
+            disp = F.interpolate(
+                disp,
+                [self.opt.height, self.opt.width],
+                mode="bilinear",
+                align_corners=False,
+            )
+            source_scale = 0
+            _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth)
+            outputs[("depth", 0, scale)] = depth
+
+            for i, frame_id in enumerate(self.opt.frame_ids[1:]):
+                T = outputs[("cam_T_cam", 0, frame_id)]
+
+                cam_points = self.backproject_depth[source_scale](
+                    depth, inputs[("inv_K", source_scale)]
+                )
+                pix_coords = self.project_3d[source_scale](
+                    cam_points, inputs[("K", source_scale)], T
+                )
+                outputs[("sample", frame_id, scale)] = pix_coords
+
+                outputs[("color", frame_id, scale)] = F.grid_sample(
+                    inputs[("color", frame_id, source_scale)],
+                    outputs[("sample", frame_id, scale)],
+                    padding_mode="border",
+                    align_corners=True,
+                )
+                outputs[("color_identity", frame_id, scale)] = inputs[
+                    ("color", frame_id, source_scale)
+                ]
 
     def compute_losses(self, inputs, outputs, is_multi=False):
         """Compute the reprojection, smoothness and proxy supervised losses for a minibatch"""
@@ -355,78 +398,35 @@ class Trainer:
 
         return losses
 
-    def generate_images_pred(self, inputs, outputs, is_multi=False):
-        """Generate the warped (reprojected) color images for a minibatch.
-        Generated images are saved into the `outputs` dictionary.
-        """
+    def compute_reprojection_loss(self, pred, target):
+        """Computes reprojection loss between a batch of predicted and target images"""
 
-        for scale in self.opt.scales:
-            disp = outputs[("disp", scale)]
-            disp = F.interpolate(
-                disp,
-                [self.opt.height, self.opt.width],
-                mode="bilinear",
-                align_corners=False,
-            )
-            source_scale = 0
-            _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth)
-            outputs[("depth", 0, scale)] = depth
+        abs_diff = torch.abs(target - pred)
+        l1_loss = abs_diff.mean(1, True)
 
-            for i, frame_id in enumerate(self.opt.frame_ids[1:]):
-                T = outputs[("cam_T_cam", 0, frame_id)]
+        ssim_loss = self.ssim(pred, target).mean(1, True)
+        reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
 
-                cam_points = self.backproject_depth[source_scale](
-                    depth, inputs[("inv_K", source_scale)]
-                )
-                pix_coords = self.project_3d[source_scale](
-                    cam_points, inputs[("K", source_scale)], T
-                )
-                outputs[("sample", frame_id, scale)] = pix_coords
+        return reprojection_loss
 
-                outputs[("color", frame_id, scale)] = F.grid_sample(
-                    inputs[("color", frame_id, source_scale)],
-                    outputs[("sample", frame_id, scale)],
-                    padding_mode="border",
-                    align_corners=True,
-                )
-                outputs[("color_identity", frame_id, scale)] = inputs[
-                    ("color", frame_id, source_scale)
-                ]
+    @staticmethod
+    def compute_loss_masks(reprojection_loss, identity_reprojection_loss):
+        """Compute loss masks for each of standard reprojection and depth hint
+        reprojection"""
 
-    def predict_poses(self, inputs):
-        """Predict poses between input frames for monocular sequences."""
+        if identity_reprojection_loss is None:
+            # we are not using automasking - standard reprojection loss applied to all pixels
+            reprojection_loss_mask = torch.ones_like(reprojection_loss)
 
-        outputs = {}
-        if self.num_pose_frames == 2:
-            # In this setting, we compute the pose to each source frame via a
-            # separate forward pass through the pose network.
-
-            # predict poses for reprojection loss
-            # select what features the pose network takes as input
-            pose_feats = {
-                f_i: inputs["color_aug", f_i, 0] for f_i in self.opt.frame_ids
-            }
-            for f_i in self.opt.frame_ids[1:]:
-                # To maintain ordering we always pass frames in temporal order
-                if f_i < 0:
-                    pose_inputs = [pose_feats[f_i], pose_feats[0]]
-                else:
-                    pose_inputs = [pose_feats[0], pose_feats[f_i]]
-
-                pose_inputs = [self.models["pose_encoder"](torch.cat(pose_inputs, 1))]
-
-                axisangle, translation = self.models["pose"](pose_inputs)
-                outputs[("axisangle", 0, f_i)] = axisangle
-                outputs[("translation", 0, f_i)] = translation
-
-                # Invert the matrix if the frame id is negative
-                outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
-                    axisangle[:, 0], translation[:, 0], invert=(f_i < 0)
-                )
         else:
-            raise NotImplementedError
+            # we are using automasking
+            all_losses = torch.cat(
+                [reprojection_loss, identity_reprojection_loss], dim=1
+            )
+            idxs = torch.argmin(all_losses, dim=1, keepdim=True)
+            reprojection_loss_mask = (idxs == 0).float()
 
-        return outputs
+        return reprojection_loss_mask
 
     def val(self):
         """Validate the model on a single minibatch"""

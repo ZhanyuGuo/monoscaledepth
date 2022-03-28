@@ -2,7 +2,7 @@ export CUDA_VISIBLE_DEVICES=1
 
 DATA_PATH=~/dataset/kitti_raw_pose/dataset
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_raw_sup_20_mono
+MODEL_NAME=kitti_raw_20_mono
 DATASET=kitti_raw_pose
 SPLIT=kitti_raw_pose
 

@@ -7,12 +7,12 @@
 import os
 import argparse
 
-# the directory that options.py resides in
-file_dir = os.path.dirname(__file__)
-
 
 class MonoscaledepthOptions:
     def __init__(self):
+        # the directory that options.py resides in
+        file_dir = os.path.dirname(__file__)
+
         self.parser = argparse.ArgumentParser(description="MonoScaleDepth options")
 
         # PATHS
@@ -108,7 +108,7 @@ class MonoscaledepthOptions:
             help="step size of the scheduler",
             default=15,
         )
-        
+
         # ABLATION options
         self.parser.add_argument(
             "--weights_init",
@@ -126,6 +126,11 @@ class MonoscaledepthOptions:
             "--num_workers", type=int, help="number of dataloader workers", default=12
         )
 
+        # LOADING options
+        self.parser.add_argument(
+            "--load_weights_folder", type=str, help="name of model to load"
+        )
+
         # LOGGING options
         self.parser.add_argument(
             "--log_frequency",
@@ -138,6 +143,23 @@ class MonoscaledepthOptions:
             type=int,
             help="number of epochs between each save",
             default=1,
+        )
+
+        # EVALUATION options
+        self.parser.add_argument(
+            "--pred_depth_scale_factor",
+            help="if set multiplies predictions by this number",
+            type=float,
+            default=1,
+        )
+        self.parser.add_argument(
+            "--eval_split",
+            type=str,
+            default="eigen",
+            choices=[
+                "eigen",
+            ],
+            help="which split to run eval on",
         )
 
     def parse(self):

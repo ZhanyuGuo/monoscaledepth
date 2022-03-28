@@ -17,7 +17,7 @@ class PoseDecoder(nn.Module):
 
         self.num_ch_enc = num_ch_enc
         self.num_input_features = num_input_features
-        
+
         if num_frames_to_predict_for is None:
             num_frames_to_predict_for = num_input_features - 1
         self.num_frames_to_predict_for = num_frames_to_predict_for
@@ -31,7 +31,7 @@ class PoseDecoder(nn.Module):
         self.relu = nn.ReLU()
 
         self.net = nn.ModuleList(list(self.convs.values()))
-    
+
     def forward(self, input_features):
         last_features = [f[-1] for f in input_features]
 
@@ -43,7 +43,7 @@ class PoseDecoder(nn.Module):
             out = self.convs[("pose", i)](out)
             if i != 2:
                 out = self.relu(out)
-            
+
         out = out.mean(3).mean(2)
         out = 0.01 * out.view(-1, self.num_frames_to_predict_for, 1, 6)
 
