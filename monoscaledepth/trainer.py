@@ -64,7 +64,10 @@ class Trainer:
 
         print("Loading frames: {}".format(frames_to_load))
 
+        self.pose_supervise = False
+
         # MODEL SETUP
+        # depth encoder and decoder
         self.models["mono_encoder"] = networks.ResnetEncoder(
             num_layers=18, pretrained=self.opt.weights_init == "pretrained"
         )
@@ -76,6 +79,7 @@ class Trainer:
         self.parameters_to_train += list(self.models["mono_encoder"].parameters())
         self.parameters_to_train += list(self.models["mono_depth"].parameters())
 
+        # pose encoder and decoder
         self.models["pose_encoder"] = networks.ResnetEncoder(
             num_layers=18,
             pretrained=self.opt.weights_init == "pretrained",
@@ -160,8 +164,9 @@ class Trainer:
         for mode in ["train", "val"]:
             self.writers[mode] = SummaryWriter(os.path.join(self.log_path, mode))
 
-        self.ssim = SSIM()
-        self.ssim.to(self.device)
+        if not self.opt.no_ssim:
+            self.ssim = SSIM()
+            self.ssim.to(self.device)
 
         self.backproject_depth = {}
         self.project_3d = {}
@@ -202,6 +207,12 @@ class Trainer:
         self.step = 0
         self.start_time = time.time()
         for self.epoch in range(self.opt.num_epochs):
+            if (
+                self.opt.add_pose_supervise
+                and self.epoch == self.opt.begin_supervise_epoch
+            ):
+                self.pose_supervise = True
+
             self.run_epoch()
             if (self.epoch + 1) % self.opt.save_frequency == 0:
                 self.save_model()
@@ -255,6 +266,14 @@ class Trainer:
 
         self.generate_images_pred(inputs, mono_outputs, is_multi=False)
         mono_losses = self.compute_losses(inputs, mono_outputs, is_multi=False)
+
+        if self.pose_supervise:
+            pose_losses = self.compute_pose_losses(inputs, mono_outputs)
+        else:
+            pose_losses = torch.tensor(0)
+
+        mono_losses["pose"] = pose_losses
+        mono_losses["loss"] += self.opt.pose_weight * mono_losses["pose"]
 
         return mono_outputs, mono_losses
 
@@ -327,9 +346,10 @@ class Trainer:
                     padding_mode="border",
                     align_corners=True,
                 )
-                outputs[("color_identity", frame_id, scale)] = inputs[
-                    ("color", frame_id, source_scale)
-                ]
+                if not self.opt.disable_automasking:
+                    outputs[("color_identity", frame_id, scale)] = inputs[
+                        ("color", frame_id, source_scale)
+                    ]
 
     def compute_losses(self, inputs, outputs, is_multi=False):
         """Compute the reprojection, smoothness and proxy supervised losses for a minibatch"""
@@ -351,26 +371,29 @@ class Trainer:
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target))
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
-            identity_reprojection_losses = []
-            for frame_id in self.opt.frame_ids[1:]:
-                pred = inputs[("color", frame_id, source_scale)]
-                identity_reprojection_losses.append(
-                    self.compute_reprojection_loss(pred, target)
+            if not self.opt.disable_automasking:
+                identity_reprojection_losses = []
+                for frame_id in self.opt.frame_ids[1:]:
+                    pred = inputs[("color", frame_id, source_scale)]
+                    identity_reprojection_losses.append(
+                        self.compute_reprojection_loss(pred, target)
+                    )
+
+                identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
+
+                # differently to Monodepth2, compute mins as we go
+                identity_reprojection_loss, _ = torch.min(
+                    identity_reprojection_losses, dim=1, keepdim=True
                 )
+                # differently to Monodepth2, compute mins as we go
+                reprojection_loss, _ = torch.min(reprojection_losses, dim=1, keepdim=True)
 
-            identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
-
-            # differently to Monodepth2, compute mins as we go
-            identity_reprojection_loss, _ = torch.min(
-                identity_reprojection_losses, dim=1, keepdim=True
-            )
-            # differently to Monodepth2, compute mins as we go
-            reprojection_loss, _ = torch.min(reprojection_losses, dim=1, keepdim=True)
-
-            # add random numbers to break ties
-            identity_reprojection_loss += (
-                torch.randn(identity_reprojection_loss.shape).to(self.device) * 0.00001
-            )
+                # add random numbers to break ties
+                identity_reprojection_loss += (
+                    torch.randn(identity_reprojection_loss.shape).to(self.device) * 0.00001
+                )
+            else:
+                identity_reprojection_loss = None
 
             # find minimum losses from [reprojection, identity]
             reprojection_loss_mask = self.compute_loss_masks(
@@ -404,8 +427,11 @@ class Trainer:
         abs_diff = torch.abs(target - pred)
         l1_loss = abs_diff.mean(1, True)
 
-        ssim_loss = self.ssim(pred, target).mean(1, True)
-        reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
+        if self.opt.no_ssim:
+            reprojection_loss = l1_loss
+        else:
+            ssim_loss = self.ssim(pred, target).mean(1, True)
+            reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
 
         return reprojection_loss
 
@@ -427,6 +453,30 @@ class Trainer:
             reprojection_loss_mask = (idxs == 0).float()
 
         return reprojection_loss_mask
+
+    def compute_pose_losses(self, inputs, outputs):
+        """Compute pose losses to solve scale ambiguity."""
+
+        pose_losses = 0
+
+        T_W_GT = [inputs[("gt_pose", i)] for i in range(-1, 2)]
+
+        T_n1_W_GT = torch.inverse(T_W_GT[0])
+        T_p1_W_GT = torch.inverse(T_W_GT[2])
+
+        T_n1_0_GT = torch.matmul(T_n1_W_GT, T_W_GT[1])
+        T_p1_0_GT = torch.matmul(T_p1_W_GT, T_W_GT[1])
+
+        t_n1_0_GT = T_n1_0_GT[:, :3, -1]
+        t_p1_0_GT = T_p1_0_GT[:, :3, -1]
+
+        t_n1_0 = outputs[("cam_T_cam", 0, -1)][:, :3, -1]
+        t_p1_0 = outputs[("cam_T_cam", 0, 1)][:, :3, -1]
+
+        pose_losses += (t_n1_0_GT.norm(dim=1) - t_n1_0.norm(dim=1)).abs().mean()
+        pose_losses += (t_p1_0_GT.norm(dim=1) - t_p1_0.norm(dim=1)).abs().mean()
+
+        return pose_losses
 
     def val(self):
         """Validate the model on a single minibatch"""

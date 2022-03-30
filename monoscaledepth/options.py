@@ -117,7 +117,32 @@ class MonoscaledepthOptions:
             default="pretrained",
             choices=["pretrained", "scratch"],
         )
-
+        self.parser.add_argument(
+            "--no_ssim", help="if set, disables ssim in the loss", action="store_true"
+        )
+        self.parser.add_argument(
+            "--disable_automasking",
+            help="if set, doesn't do auto-masking",
+            action="store_true",
+        )
+        self.parser.add_argument(
+            "--add_pose_supervise",
+            action="store_true",
+            help="If set, supervise pose.",
+        )
+        self.parser.add_argument(
+            "--begin_supervise_epoch",
+            type=int,
+            default=10,
+            help="Sets the epoch number at which to begin the pose supervise.",
+        )
+        self.parser.add_argument(
+            "--pose_weight",
+            type=float,
+            help="pose weight",
+            default=5e-2,
+        )
+        
         # SYSTEM options
         self.parser.add_argument(
             "--no_cuda", help="if set disables CUDA", action="store_true"

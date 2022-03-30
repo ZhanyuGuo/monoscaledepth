@@ -125,6 +125,7 @@ class KITTIRawPoseDataset(MonoDataset):
             2011_09_26_drive_0001_sync_02 0000000001
             2011_09_26_drive_0001_sync_02 0000000002
         """
+
         folder, frame_index = self.filenames[index].split()
         side = None
         return folder, frame_index, side
@@ -138,6 +139,8 @@ class KITTIRawPoseDataset(MonoDataset):
         color = self.loader(self.get_image_path(folder, frame_index))
         color = np.array(color)
 
+        pose_seq = self.load_pose(folder, frame_index)
+
         w = color.shape[1] // 3
         inputs = {}
 
@@ -148,6 +151,10 @@ class KITTIRawPoseDataset(MonoDataset):
         if do_flip:
             for key in inputs:
                 inputs[key] = inputs[key].transpose(pil.FLIP_LEFT_RIGHT)
+
+        inputs[("gt_pose", -1)] = pose_seq[0]
+        inputs[("gt_pose", 0)] = pose_seq[1]
+        inputs[("gt_pose", 1)] = pose_seq[2]
 
         return inputs
 
@@ -167,6 +174,20 @@ class KITTIRawPoseDataset(MonoDataset):
         intrinsics[0, :] /= self.RAW_WIDTH
         intrinsics[1, :] /= self.RAW_HEIGHT
         return intrinsics
+
+    def load_pose(self, folder, frame_index):
+        pose_file = os.path.join(
+            self.data_path, folder, "{}_pose.txt".format(frame_index)
+        )
+        with open(pose_file, "r") as f:
+            lines = f.readlines()
+
+        pose_seq = []
+        for line in lines:
+            pose = np.array(line.split(), dtype="float32").reshape((4, 4))
+            pose_seq.append(pose)
+
+        return pose_seq
 
     def check_depth(self):
         return False
