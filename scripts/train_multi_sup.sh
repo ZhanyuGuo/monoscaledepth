@@ -2,14 +2,15 @@ export CUDA_VISIBLE_DEVICES=1
 
 DATA_PATH=~/dataset/kitti_raw_pose/dataset
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_raw_20_mono_3
+MODEL_NAME=kitti_raw_20_multi_sup
 DATASET=kitti_raw_pose
 SPLIT=kitti_raw_pose
 
 EPOCHS=20
 STEP_SIZE=15
+FREEZE_EPOCHS=15
 SAVE_FREQUENCY=1
-BATCH_SIZE=12
+BATCH_SIZE=8
 
 python -m monoscaledepth.train \
    --data_path $DATA_PATH \
@@ -20,5 +21,5 @@ python -m monoscaledepth.train \
    --batch_size $BATCH_SIZE \
    --num_epochs $EPOCHS \
    --scheduler_step_size $STEP_SIZE \
+   --freeze_teacher_epoch $FREEZE_EPOCHS \
    --save_frequency $SAVE_FREQUENCY \
-   --no_multi_depth \

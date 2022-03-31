@@ -60,14 +60,60 @@ class Trainer:
         assert len(self.opt.frame_ids) > 1, "frame_ids must have more than 1"
 
         # check the frames we need the dataloader to load
-        frames_to_load = self.opt.frame_ids.copy()  ## [0, -1, 1]
+        frames_to_load = self.opt.frame_ids.copy()
+
+        if not self.opt.no_multi_depth:
+            # lookup frames in multi frame path
+            self.matching_ids = [0]
+            if self.opt.use_future_frame:
+                self.matching_ids.append(1)
+
+            for idx in range(-1, -1 - self.opt.num_matching_frames, -1):
+                self.matching_ids.append(idx)
+                if idx not in frames_to_load:
+                    frames_to_load.append(idx)
 
         print("Loading frames: {}".format(frames_to_load))
 
         self.pose_supervise = False
 
+        # fmt: off
+        self.train_teacher_and_pose = not self.opt.freeze_teacher_and_pose or self.opt.no_multi_depth
+        # fmt: on
+
+
+
         # MODEL SETUP
-        # depth encoder and decoder
+        if not self.opt.no_multi_depth:
+            # cost volume depth tracker
+            self.min_depth_tracker = 0.1
+            self.max_depth_tracker = 10.0
+            if self.train_teacher_and_pose:
+                print("using adaptive depth binning!")
+            else:
+                print("fixing pose network and monocular network!")
+
+            # multi depth encoder and decoder
+            self.models["encoder"] = networks.ResnetEncoderMatching(
+                num_layers=self.opt.num_layers,
+                pretrained=self.opt.weights_init == "pretrained",
+                input_height=self.opt.height,
+                input_width=self.opt.width,
+                adaptive_bins=True,
+                min_depth_bin=self.min_depth_tracker,
+                max_depth_bin=self.max_depth_tracker,
+                depth_binning=self.opt.depth_binning,
+                num_depth_bins=self.opt.num_depth_bins,
+            )
+            self.models["depth"] = networks.DepthDecoder(
+                num_ch_enc=self.models["encoder"].num_ch_enc, scales=self.opt.scales
+            )
+            self.models["encoder"].to(self.device)
+            self.models["depth"].to(self.device)
+            self.parameters_to_train += list(self.models["encoder"].parameters())
+            self.parameters_to_train += list(self.models["depth"].parameters())
+
+        # mono depth encoder and decoder
         self.models["mono_encoder"] = networks.ResnetEncoder(
             num_layers=18, pretrained=self.opt.weights_init == "pretrained"
         )
@@ -76,8 +122,9 @@ class Trainer:
         )
         self.models["mono_encoder"].to(self.device)
         self.models["mono_depth"].to(self.device)
-        self.parameters_to_train += list(self.models["mono_encoder"].parameters())
-        self.parameters_to_train += list(self.models["mono_depth"].parameters())
+        if self.train_teacher_and_pose:
+            self.parameters_to_train += list(self.models["mono_encoder"].parameters())
+            self.parameters_to_train += list(self.models["mono_depth"].parameters())
 
         # pose encoder and decoder
         self.models["pose_encoder"] = networks.ResnetEncoder(
@@ -92,8 +139,9 @@ class Trainer:
         )
         self.models["pose_encoder"].to(self.device)
         self.models["pose"].to(self.device)
-        self.parameters_to_train += list(self.models["pose_encoder"].parameters())
-        self.parameters_to_train += list(self.models["pose"].parameters())
+        if self.train_teacher_and_pose:
+            self.parameters_to_train += list(self.models["pose_encoder"].parameters())
+            self.parameters_to_train += list(self.models["pose"].parameters())
 
         self.model_optimizer = optim.Adam(
             self.parameters_to_train, self.opt.learning_rate
@@ -118,10 +166,10 @@ class Trainer:
         img_ext = ".png" if self.opt.png else ".jpg"
 
         num_train_samples = len(train_filenames)
-        self.num_total_steps = (
-            num_train_samples // self.opt.batch_size * self.opt.num_epochs
-        )
-
+        # fmt: off
+        self.num_total_steps = num_train_samples // self.opt.batch_size * self.opt.num_epochs
+        # fmt: on
+        
         train_dataset = self.dataset(
             self.opt.data_path,
             train_filenames,
@@ -213,6 +261,32 @@ class Trainer:
             ):
                 self.pose_supervise = True
 
+            if (
+                self.epoch == self.opt.freeze_teacher_epoch
+                and not self.opt.no_multi_depth
+            ):
+                self.train_teacher_and_pose = False
+                self.pose_supervise = False
+                print("freezing teacher and pose networks!")
+
+                # here we reinitialise our optimizer to ensure there are no updates to the
+                # teacher and pose networks
+                self.parameters_to_train = []
+                self.parameters_to_train += list(self.models["encoder"].parameters())
+                self.parameters_to_train += list(self.models["depth"].parameters())
+                self.model_optimizer = optim.Adam(
+                    self.parameters_to_train, self.opt.learning_rate
+                )
+
+                ## Q: Reset the scheduler and maybe no lr decay in the whole training?
+                ## A: NO. After re-initializing, it resets the steps(epochs).
+                ## Solved.
+                self.model_lr_scheduler = optim.lr_scheduler.StepLR(
+                    self.model_optimizer, self.opt.scheduler_step_size, 0.1
+                )
+                for _ in range(self.epoch):
+                    self.model_lr_scheduler.step()
+
             self.run_epoch()
             if (self.epoch + 1) % self.opt.save_frequency == 0:
                 self.save_model()
@@ -257,25 +331,144 @@ class Trainer:
             inputs[key] = ipt.to(self.device)
 
         mono_outputs = {}
+        outputs = {}
 
-        pose_pred = self.predict_poses(inputs)
+        # predict poses for all frames
+        if self.train_teacher_and_pose:
+            pose_pred = self.predict_poses(inputs)
+        else:
+            with torch.no_grad():
+                pose_pred = self.predict_poses(inputs)
+
         mono_outputs.update(pose_pred)
+        outputs.update(pose_pred)
 
-        feats = self.models["mono_encoder"](inputs["color_aug", 0, 0])
-        mono_outputs.update(self.models["mono_depth"](feats))
+        # single frame path
+        if self.train_teacher_and_pose:
+            feats = self.models["mono_encoder"](inputs["color_aug", 0, 0])
+            mono_outputs.update(self.models["mono_depth"](feats))
+        else:
+            with torch.no_grad():
+                feats = self.models["mono_encoder"](inputs["color_aug", 0, 0])
+                mono_outputs.update(self.models["mono_depth"](feats))
 
         self.generate_images_pred(inputs, mono_outputs, is_multi=False)
         mono_losses = self.compute_losses(inputs, mono_outputs, is_multi=False)
 
+        if not self.opt.no_multi_depth:
+            # grab poses + frames and stack for input to the multi frame network
+            relative_poses = [
+                inputs[("relative_pose", idx)] for idx in self.matching_ids[1:]
+            ]
+            relative_poses = torch.stack(relative_poses, 1)
+
+            # batch x frames x 3 x h x w
+            lookup_frames = [
+                inputs[("color_aug", idx, 0)] for idx in self.matching_ids[1:]
+            ]
+            lookup_frames = torch.stack(lookup_frames, 1)
+
+            # apply static frame and zero cost volume augmentation
+            batch_size = len(lookup_frames)
+            augmentation_mask = (
+                torch.zeros([batch_size, 1, 1, 1]).to(self.device).float()
+            )
+            if is_train and not self.opt.no_matching_augmentation:
+                for batch_idx in range(batch_size):
+                    rand_num = random.random()
+                    # static camera augmentation -> overwrite lookup frames with current frame
+                    if rand_num < 0.25:
+                        replace_frames = [
+                            inputs[("color", 0, 0)][batch_idx]
+                            for _ in self.matching_ids[1:]
+                        ]
+                        replace_frames = torch.stack(replace_frames, 0)
+                        lookup_frames[batch_idx] = replace_frames
+                        augmentation_mask[batch_idx] += 1
+                    elif rand_num < 0.5:
+                        relative_poses[batch_idx] *= 0
+                        augmentation_mask[batch_idx] += 1
+            outputs["augmentation_mask"] = augmentation_mask
+
+            min_depth_bin = self.min_depth_tracker
+            max_depth_bin = self.max_depth_tracker
+
+            # update multi frame outputs dictionary with single frame outputs
+            for key in list(mono_outputs.keys()):
+                _key = list(key)
+                if _key[0] in ["depth", "disp"]:
+                    _key[0] = "mono_" + key[0]
+                    _key = tuple(_key)
+                    outputs[_key] = mono_outputs[key]
+
+            # multi frame path
+            features, lowest_cost, confidence_mask = self.models["encoder"](
+                inputs["color_aug", 0, 0],
+                lookup_frames,
+                relative_poses,
+                inputs[("K", 2)],
+                inputs[("inv_K", 2)],
+                min_depth_bin=min_depth_bin,
+                max_depth_bin=max_depth_bin,
+            )
+            outputs.update(self.models["depth"](features))
+
+            outputs["lowest_cost"] = F.interpolate(
+                lowest_cost.unsqueeze(1),
+                [self.opt.height, self.opt.width],
+                mode="nearest",
+            )[:, 0]
+            outputs["consistency_mask"] = F.interpolate(
+                confidence_mask.unsqueeze(1),
+                [self.opt.height, self.opt.width],
+                mode="nearest",
+            )[:, 0]
+
+            if not self.opt.disable_motion_masking:
+                outputs["consistency_mask"] = outputs[
+                    "consistency_mask"
+                ] * self.compute_matching_mask(outputs)
+
+            self.generate_images_pred(inputs, outputs, is_multi=True)
+            losses = self.compute_losses(inputs, outputs, is_multi=True)
+
+            # update adaptive depth bins
+            if self.train_teacher_and_pose:
+                self.update_adaptive_depth_bins(outputs)
+
+            # update losses with single frame losses
+            if self.train_teacher_and_pose:
+                for key, val in mono_losses.items():
+                    losses[key] += val
+        else:
+            losses = mono_losses
+            outputs = mono_outputs
+
         if self.pose_supervise:
-            pose_losses = self.compute_pose_losses(inputs, mono_outputs)
+            pose_losses = self.compute_pose_losses(inputs, outputs)
         else:
             pose_losses = torch.tensor(0)
 
-        mono_losses["pose"] = pose_losses
-        mono_losses["loss"] += self.opt.pose_weight * mono_losses["pose"]
+        losses["pose"] = pose_losses
+        losses["loss"] += self.opt.pose_weight * losses["pose"]
 
-        return mono_outputs, mono_losses
+        return outputs, losses
+
+    def update_adaptive_depth_bins(self, outputs):
+        """Update the current estimates of min/max depth using exponental weighted average"""
+
+        min_depth = outputs[("mono_depth", 0, 0)].detach().min(-1)[0].min(-1)[0]
+        max_depth = outputs[("mono_depth", 0, 0)].detach().max(-1)[0].max(-1)[0]
+
+        min_depth = min_depth.mean().cpu().item()
+        max_depth = max_depth.mean().cpu().item()
+
+        # increase range slightly
+        min_depth = max(self.opt.min_depth, min_depth * 0.9)
+        max_depth = max_depth * 1.1
+
+        self.max_depth_tracker = self.max_depth_tracker * 0.99 + max_depth * 0.01
+        self.min_depth_tracker = self.min_depth_tracker * 0.99 + min_depth * 0.01
 
     def predict_poses(self, inputs):
         """Predict poses between input frames for monocular sequences."""
@@ -307,6 +500,52 @@ class Trainer:
                 outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
                     axisangle[:, 0], translation[:, 0], invert=(f_i < 0)
                 )
+            if not self.opt.no_multi_depth:
+                # now we need poses for matching - compute without gradients
+                pose_feats = {
+                    f_i: inputs["color_aug", f_i, 0] for f_i in self.matching_ids
+                }
+                with torch.no_grad():
+                    # compute pose from 0->-1, -1->-2, -2->-3 etc and multiply to find 0->-3
+                    for fi in self.matching_ids[1:]:
+                        if fi < 0:
+                            pose_inputs = [pose_feats[fi], pose_feats[fi + 1]]
+                            pose_inputs = [
+                                self.models["pose_encoder"](torch.cat(pose_inputs, 1))
+                            ]
+                            axisangle, translation = self.models["pose"](pose_inputs)
+                            pose = transformation_from_parameters(
+                                axisangle[:, 0], translation[:, 0], invert=True
+                            )
+
+                            # now find 0->fi pose
+                            if fi != -1:
+                                pose = torch.matmul(
+                                    pose, inputs[("relative_pose", fi + 1)]
+                                )
+
+                        else:
+                            pose_inputs = [pose_feats[fi - 1], pose_feats[fi]]
+                            pose_inputs = [
+                                self.models["pose_encoder"](torch.cat(pose_inputs, 1))
+                            ]
+                            axisangle, translation = self.models["pose"](pose_inputs)
+                            pose = transformation_from_parameters(
+                                axisangle[:, 0], translation[:, 0], invert=False
+                            )
+
+                            # now find 0->fi pose
+                            if fi != 1:
+                                pose = torch.matmul(
+                                    pose, inputs[("relative_pose", fi - 1)]
+                                )
+
+                        # set missing images to 0 pose
+                        for batch_idx, feat in enumerate(pose_feats[fi]):
+                            if feat.sum() == 0:
+                                pose[batch_idx] *= 0
+
+                        inputs[("relative_pose", fi)] = pose
         else:
             raise NotImplementedError
 
@@ -332,6 +571,10 @@ class Trainer:
             for i, frame_id in enumerate(self.opt.frame_ids[1:]):
                 T = outputs[("cam_T_cam", 0, frame_id)]
 
+                if is_multi:
+                    # don't update posenet based on multi frame prediction
+                    T = T.detach()
+
                 cam_points = self.backproject_depth[source_scale](
                     depth, inputs[("inv_K", source_scale)]
                 )
@@ -346,10 +589,33 @@ class Trainer:
                     padding_mode="border",
                     align_corners=True,
                 )
+
                 if not self.opt.disable_automasking:
                     outputs[("color_identity", frame_id, scale)] = inputs[
                         ("color", frame_id, source_scale)
                     ]
+
+    def compute_matching_mask(self, outputs):
+        """NOTE Generate a mask of where we cannot trust the cost volume, based on the difference
+        between the cost volume and the teacher, monocular network"""
+
+        # ------- Origin -------
+        mono_output = outputs[("mono_depth", 0, 0)]
+        matching_depth = 1 / outputs["lowest_cost"].unsqueeze(1).to(self.device)
+
+        # ---- Normalization ----
+        # mono_output = outputs[("mono_depth", 0, 0)]
+        # mono_output_mean = mono_output.mean(2, True).mean(3, True)
+        # mono_output /= mono_output_mean + 1e-7
+
+        # matching_depth = 1 / outputs["lowest_cost"].unsqueeze(1).to(self.device)
+        # matching_depth_mean = matching_depth.mean(2, True).mean(3, True)
+        # matching_depth /= matching_depth_mean + 1e-7
+
+        # mask where they differ by a large amount
+        mask = ((matching_depth - mono_output) / mono_output) < 1.0
+        mask *= ((mono_output - matching_depth) / matching_depth) < 1.0
+        return mask[:, 0]
 
     def compute_losses(self, inputs, outputs, is_multi=False):
         """Compute the reprojection, smoothness and proxy supervised losses for a minibatch"""
@@ -379,18 +645,23 @@ class Trainer:
                         self.compute_reprojection_loss(pred, target)
                     )
 
-                identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
+                identity_reprojection_losses = torch.cat(
+                    identity_reprojection_losses, 1
+                )
 
                 # differently to Monodepth2, compute mins as we go
                 identity_reprojection_loss, _ = torch.min(
                     identity_reprojection_losses, dim=1, keepdim=True
                 )
                 # differently to Monodepth2, compute mins as we go
-                reprojection_loss, _ = torch.min(reprojection_losses, dim=1, keepdim=True)
+                reprojection_loss, _ = torch.min(
+                    reprojection_losses, dim=1, keepdim=True
+                )
 
                 # add random numbers to break ties
                 identity_reprojection_loss += (
-                    torch.randn(identity_reprojection_loss.shape).to(self.device) * 0.00001
+                    torch.randn(identity_reprojection_loss.shape).to(self.device)
+                    * 0.00001
                 )
             else:
                 identity_reprojection_loss = None
@@ -400,13 +671,59 @@ class Trainer:
                 reprojection_loss, identity_reprojection_loss
             )
 
+            # find which pixels to apply reprojection loss to, and which pixels to apply
+            # consistency loss to
+            if is_multi:
+                reprojection_loss_mask = torch.ones_like(reprojection_loss_mask)
+                if not self.opt.disable_motion_masking:
+                    reprojection_loss_mask = reprojection_loss_mask * outputs[
+                        "consistency_mask"
+                    ].unsqueeze(1)
+                if not self.opt.no_matching_augmentation:
+                    reprojection_loss_mask = reprojection_loss_mask * (
+                        1 - outputs["augmentation_mask"]
+                    )
+                consistency_mask = (1 - reprojection_loss_mask).float()
+
             reprojection_loss = reprojection_loss * reprojection_loss_mask
             reprojection_loss = reprojection_loss.sum() / (
                 reprojection_loss_mask.sum() + 1e-7
             )
 
+            # consistency loss:
+            # encourage multi frame prediction to be like singe frame where masking is happening
+            if is_multi:
+                multi_depth = outputs[("depth", 0, scale)]
+                # no gradients for mono prediction!
+                mono_depth = outputs[("mono_depth", 0, scale)].detach()
+                consistency_loss = (
+                    torch.abs(multi_depth - mono_depth) * consistency_mask
+                )
+                consistency_loss = consistency_loss.mean()
+
+                # NOTE: To keep scale.
+                if (
+                    self.opt.add_pose_supervise
+                    and self.epoch >= self.opt.begin_supervise_epoch
+                ):
+                    consistency_loss /= 30
+
+                # save for logging to tensorboard
+                consistency_target = (
+                    mono_depth.detach() * consistency_mask
+                    + multi_depth.detach() * (1 - consistency_mask)
+                )
+                consistency_target = 1 / consistency_target
+                outputs["consistency_target/{}".format(scale)] = consistency_target
+
+                # consistency_loss = 0  # TEST
+                losses["consistency_loss/{}".format(scale)] = consistency_loss
+            else:
+                consistency_loss = 0
+
             losses["reproj_loss/{}".format(scale)] = reprojection_loss
-            loss += reprojection_loss
+
+            loss += reprojection_loss + consistency_loss
 
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
@@ -520,6 +837,41 @@ class Trainer:
 
             disp = colormap(outputs[("disp", s)][j, 0])
             writer.add_image("disp_mono_{}/{}".format(s, j), disp, self.step)
+
+            if not self.opt.no_multi_depth:
+                disp = colormap(outputs[("disp", s)][j, 0])
+                writer.add_image("disp_multi_{}/{}".format(s, j), disp, self.step)
+
+                if outputs.get("lowest_cost") is not None:
+                    lowest_cost = outputs["lowest_cost"][j]
+
+                    consistency_mask = (
+                        outputs["consistency_mask"][j]
+                        .cpu()
+                        .detach()
+                        .unsqueeze(0)
+                        .numpy()
+                    )
+
+                    min_val = np.percentile(lowest_cost.numpy(), 10)
+                    max_val = np.percentile(lowest_cost.numpy(), 90)
+                    lowest_cost = torch.clamp(lowest_cost, min_val, max_val)
+                    lowest_cost = colormap(lowest_cost)
+
+                    writer.add_image("lowest_cost/{}".format(j), lowest_cost, self.step)
+                    writer.add_image(
+                        "lowest_cost_masked/{}".format(j),
+                        lowest_cost * consistency_mask,
+                        self.step,
+                    )
+                    writer.add_image(
+                        "consistency_mask/{}".format(j), consistency_mask, self.step
+                    )
+
+                    consistency_target = colormap(outputs["consistency_target/0"][j])
+                    writer.add_image(
+                        "consistency_target/{}".format(j), consistency_target, self.step
+                    )
 
     def log_time(self, batch_idx, duration, loss):
         """Print a logging statement to the terminal"""

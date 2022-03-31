@@ -46,6 +46,23 @@ class MonoscaledepthOptions:
             default="kitti_raw_pose",
         )
         self.parser.add_argument(
+            "--num_layers",
+            type=int,
+            help="number of resnet layers",
+            default=18,
+            choices=[18, 34, 50, 101, 152],
+        )
+        self.parser.add_argument(
+            "--depth_binning",
+            help="defines how the depth bins are constructed for the cost volume. "
+            "'linear' is uniformly sampled in depth space,"
+            "'inverse' is uniformly sampled in inverse depth space",
+            type=str,
+            choices=["linear", "inverse"],
+            default="linear",
+        ),
+        self.parser.add_argument("--num_depth_bins", type=int, default=96)
+        self.parser.add_argument(
             "--height", type=int, help="input image height", default=192
         )
         self.parser.add_argument(
@@ -108,6 +125,19 @@ class MonoscaledepthOptions:
             help="step size of the scheduler",
             default=15,
         )
+        self.parser.add_argument(
+            "--freeze_teacher_and_pose",
+            action="store_true",
+            help="If set, freeze the weights of the single frame teacher"
+            " network and pose network.",
+        )
+        self.parser.add_argument(
+            "--freeze_teacher_epoch",
+            type=int,
+            default=15,
+            help="Sets the epoch number at which to freeze the teacher"
+            "network and the pose network.",
+        )
 
         # ABLATION options
         self.parser.add_argument(
@@ -142,7 +172,35 @@ class MonoscaledepthOptions:
             help="pose weight",
             default=5e-2,
         )
-        
+        self.parser.add_argument(
+            "--use_future_frame",
+            action="store_true",
+            help="If set, will also use a future frame in time for matching.",
+        )
+        self.parser.add_argument(
+            "--num_matching_frames",
+            help="Sets how many previous frames to load to build the cost volume",
+            type=int,
+            default=1,
+        )
+        self.parser.add_argument(
+            "--disable_motion_masking",
+            help="If set, will not apply consistency loss in regions where"
+            "the cost volume is deemed untrustworthy",
+            action="store_true",
+        )
+        self.parser.add_argument(
+            "--no_matching_augmentation",
+            action="store_true",
+            help="If set, will not apply static camera augmentation or "
+            "zero cost volume augmentation during training",
+        )
+        self.parser.add_argument(
+            "--no_multi_depth",
+            action="store_true",
+            help="If set, only use mono depth",
+        )
+
         # SYSTEM options
         self.parser.add_argument(
             "--no_cuda", help="if set disables CUDA", action="store_true"
@@ -172,10 +230,26 @@ class MonoscaledepthOptions:
 
         # EVALUATION options
         self.parser.add_argument(
+            "--eval_stereo", help="if set evaluates in stereo mode", action="store_true"
+        )
+        self.parser.add_argument(
+            "--eval_mono", help="if set evaluates in mono mode", action="store_true"
+        )
+        self.parser.add_argument(
+            "--disable_median_scaling",
+            help="if set disables median scaling in evaluation",
+            action="store_true",
+        )
+        self.parser.add_argument(
             "--pred_depth_scale_factor",
             help="if set multiplies predictions by this number",
             type=float,
             default=1,
+        )
+        self.parser.add_argument(
+            "--ext_disp_to_eval",
+            type=str,
+            help="optional path to a .npy disparities file to evaluate",
         )
         self.parser.add_argument(
             "--eval_split",
@@ -185,6 +259,48 @@ class MonoscaledepthOptions:
                 "eigen",
             ],
             help="which split to run eval on",
+        )
+        self.parser.add_argument(
+            "--save_pred_disps",
+            help="if set saves predicted disparities",
+            action="store_true",
+        )
+        self.parser.add_argument(
+            "--no_eval", help="if set disables evaluation", action="store_true"
+        )
+        self.parser.add_argument(
+            "--eval_eigen_to_benchmark",
+            help="if set assume we are loading eigen results from npy but "
+            "we want to evaluate using the new benchmark.",
+            action="store_true",
+        )
+        self.parser.add_argument(
+            "--eval_out_dir",
+            help="if set will output the disparities to this folder",
+            type=str,
+        )
+        self.parser.add_argument(
+            "--post_process",
+            help="if set will perform the flipping post processing "
+            "from the original monodepth paper",
+            action="store_true",
+        )
+        self.parser.add_argument(
+            "--zero_cost_volume",
+            action="store_true",
+            help="If set, during evaluation all poses will be set to 0, and "
+            "so we will evaluate the model in single frame mode",
+        )
+        self.parser.add_argument(
+            "--static_camera",
+            action="store_true",
+            help="If set, during evaluation the current frame will also be"
+            "used as the lookup frame, to simulate a static camera",
+        )
+        self.parser.add_argument(
+            "--eval_teacher",
+            action="store_true",
+            help="If set, the teacher network will be evaluated",
         )
 
     def parse(self):
