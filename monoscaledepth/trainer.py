@@ -81,8 +81,6 @@ class Trainer:
         self.train_teacher_and_pose = not self.opt.freeze_teacher_and_pose or self.opt.no_multi_depth
         # fmt: on
 
-
-
         # MODEL SETUP
         if not self.opt.no_multi_depth:
             # cost volume depth tracker
@@ -169,7 +167,7 @@ class Trainer:
         # fmt: off
         self.num_total_steps = num_train_samples // self.opt.batch_size * self.opt.num_epochs
         # fmt: on
-        
+
         train_dataset = self.dataset(
             self.opt.data_path,
             train_filenames,
