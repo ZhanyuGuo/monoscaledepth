@@ -148,6 +148,12 @@ class Trainer:
             self.model_optimizer, self.opt.scheduler_step_size, 0.1
         )
 
+        if self.opt.load_weights_folder is not None:
+            self.load_model()
+
+        if self.opt.mono_weights_folder is not None:
+            self.load_mono_model()
+
         print("Training model named:\n", self.opt.model_name)
         print("Models and tensorboard events files are saved to:\n", self.opt.log_dir)
         print("Training is using:\n", self.device)
@@ -918,6 +924,68 @@ class Trainer:
 
         save_path = os.path.join(save_folder, "{}.pth".format("adam"))
         torch.save(self.model_optimizer.state_dict(), save_path)
+
+    def load_mono_model(self):
+        model_list = ["pose_encoder", "pose", "mono_encoder", "mono_depth"]
+        for n in model_list:
+            print("loading {}".format(n))
+            path = os.path.join(self.opt.mono_weights_folder, "{}.pth".format(n))
+            model_dict = self.models[n].state_dict()
+            pretrained_dict = torch.load(path)
+
+            pretrained_dict = {
+                k: v for k, v in pretrained_dict.items() if k in model_dict
+            }
+            model_dict.update(pretrained_dict)
+            self.models[n].load_state_dict(model_dict)
+
+    def load_model(self):
+        """Load model(s) from disk"""
+
+        self.opt.load_weights_folder = os.path.expanduser(self.opt.load_weights_folder)
+
+        assert os.path.isdir(
+            self.opt.load_weights_folder
+        ), "Cannot find folder {}".format(self.opt.load_weights_folder)
+        print("loading model from folder {}".format(self.opt.load_weights_folder))
+
+        for n in self.opt.models_to_load:
+            print("Loading {} weights...".format(n))
+            path = os.path.join(self.opt.load_weights_folder, "{}.pth".format(n))
+            model_dict = self.models[n].state_dict()
+            pretrained_dict = torch.load(path)
+
+            if n == "encoder":
+                min_depth_bin = pretrained_dict.get("min_depth_bin")
+                max_depth_bin = pretrained_dict.get("max_depth_bin")
+                print("min depth", min_depth_bin, "max_depth", max_depth_bin)
+                if min_depth_bin is not None:
+                    # recompute bins
+                    print("setting depth bins!")
+                    self.models["encoder"].compute_depth_bins(
+                        min_depth_bin, max_depth_bin
+                    )
+
+                    self.min_depth_tracker = min_depth_bin
+                    self.max_depth_tracker = max_depth_bin
+
+            pretrained_dict = {
+                k: v for k, v in pretrained_dict.items() if k in model_dict
+            }
+            model_dict.update(pretrained_dict)
+            self.models[n].load_state_dict(model_dict)
+
+        # loading adam state
+        optimizer_load_path = os.path.join(self.opt.load_weights_folder, "adam.pth")
+        if os.path.isfile(optimizer_load_path):
+            try:
+                print("Loading Adam weights")
+                optimizer_dict = torch.load(optimizer_load_path)
+                self.model_optimizer.load_state_dict(optimizer_dict)
+            except ValueError:
+                print("Can't load Adam - using random")
+        else:
+            print("Cannot find Adam weights so Adam is randomly initialized")
 
     def set_train(self):
         """Convert all models to training mode"""
