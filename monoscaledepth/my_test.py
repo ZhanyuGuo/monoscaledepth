@@ -106,8 +106,7 @@ def compute_reprojection_loss(pred, target):
 
 
 def compute_loss_masks(reprojection_loss, identity_reprojection_loss):
-    """Compute loss masks for each of standard reprojection and depth hint
-    reprojection"""
+    """Compute loss masks for each of standard reprojection and depth hint reprojection"""
 
     if identity_reprojection_loss is None:
         # we are not using automasking - standard reprojection loss applied to all pixels
@@ -438,12 +437,12 @@ def main(args):
         im.save(name_dest_im)
         print("-> Saved output image to {}".format(name_dest_im))
 
-        # # name_dest_npy = os.path.join(directory, "{}_disp.npy".format(output_name))
-        # # np.save(name_dest_npy, sigmoid_output.cpu().numpy())
-        # # name_dest_npy = os.path.join(
-        # #     directory, "{}_disp_resized.npy".format(output_name)
-        # # )
-        # # np.save(name_dest_npy, sigmoid_output_resized)
+        # name_dest_npy = os.path.join(directory, "{}_disp.npy".format(output_name))
+        # np.save(name_dest_npy, sigmoid_output.cpu().numpy())
+        # name_dest_npy = os.path.join(
+        #     directory, "{}_disp_resized.npy".format(output_name)
+        # )
+        # np.save(name_dest_npy, sigmoid_output_resized)
 
 
 if __name__ == "__main__":

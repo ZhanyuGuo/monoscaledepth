@@ -194,3 +194,20 @@ class KITTIRawPoseDataset(MonoDataset):
 
     def get_image_path(self, folder, frame_index):
         return os.path.join(self.data_path, folder, "{}.jpg".format(frame_index))
+
+
+class KITTIOdomDataset(KITTIDataset):
+    """KITTI dataset for odometry training and testing"""
+
+    def __init__(self, *args, **kwargs):
+        super(KITTIOdomDataset, self).__init__(*args, **kwargs)
+
+    def get_image_path(self, folder, frame_index, side):
+        f_str = "{:06d}{}".format(frame_index, self.img_ext)
+        image_path = os.path.join(
+            self.data_path,
+            "sequences/{:02d}".format(int(folder)),
+            "image_{}".format(self.side_map[side]),
+            f_str,
+        )
+        return image_path

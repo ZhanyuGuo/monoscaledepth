@@ -265,6 +265,8 @@ class MonoscaledepthOptions:
             default="eigen",
             choices=[
                 "eigen",
+                "odom_9",
+                "odom_10",
             ],
             help="which split to run eval on",
         )
