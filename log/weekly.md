@@ -254,7 +254,7 @@
 
         |              |                    Image                    |
         | :----------: | :-----------------------------------------: |
-        |     原图     |    ![](assets/test_sequence_target.jpg)     |
+        |     原图     |     ![](image/test_sequence_target.jpg)     |
         |  预训练模型  | ![](image/test_sequence_target_20_pre.jpeg) |
         | 复现训练模型 | ![](image/test_sequence_target_20_new.jpeg) |
 
@@ -298,7 +298,7 @@
 
         |          |                               |
         | :------: | ----------------------------- |
-        |   原图   | ![](assets/000387.png)        |
+        |   原图   | ![](image/19_000387.png)      |
         |  无监督  | ![](image/000387_20.jpeg)     |
         | 位姿监督 | ![](image/000387_20_sup.jpeg) |
 
@@ -312,7 +312,7 @@
 
       - 在车库图像上测试.
 
-        ![](assets/10563.jpg)
+        ![](image/10563.jpg)
 
         ![](image/10563_20_kitti_odom_sup.jpeg)
 
@@ -334,7 +334,7 @@
 
         |                 |                Image                |
         | :-------------: | :---------------------------------: |
-        |      原图       |      ![](assets/19_000387.png)      |
+        |      原图       |      ![](image/19_000387.png)       |
         |   预训练模型    |    ![](image/000387_raw_20.jpeg)    |
         | 位姿监督(10:15) |  ![](image/000387_raw_sup_20.jpeg)  |
         | 位姿监督(05:15) | ![](image/000387_raw_sup_20_5.jpeg) |
@@ -429,7 +429,7 @@
 
         |                                |                 Image                 |
         | :----------------------------: | :-----------------------------------: |
-        |              原图              |       ![](assets/19_000387.png)       |
+        |              原图              |       ![](image/19_000387.png)        |
         |           预训练模型           |     ![](image/000387_raw_20.jpeg)     |
         |      位姿监督模型 (10:15)      |   ![](image/000387_raw_sup_20.jpeg)   |
         | 位姿监督模型 (w/o consistency) | ![](image/000387_wo_consistency.jpeg) |
