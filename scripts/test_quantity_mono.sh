@@ -1,6 +1,6 @@
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 
-MODEL_PATH=~/checkpoint/kitti_raw_20_5_mono_sup/models/weights_19/
+MODEL_PATH=~/checkpoint/kitti_raw_20_mono_sup_new/models/weights_19/
 DATA_PATH=~/dataset/KITTI_RAW
 
 python -m monoscaledepth.evaluate_depth \

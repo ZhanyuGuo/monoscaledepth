@@ -42,6 +42,8 @@ class MonoscaledepthOptions:
             help="which training split to use",
             choices=[
                 "kitti_raw_pose",
+                "eigen_zhou",
+                "odom",
             ],
             default="kitti_raw_pose",
         )
@@ -101,6 +103,7 @@ class MonoscaledepthOptions:
             default="kitti_raw_pose",
             choices=[
                 "kitti_raw_pose",
+                "kitti_odom_pose",
             ],
         )
         self.parser.add_argument(

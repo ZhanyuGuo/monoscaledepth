@@ -84,6 +84,7 @@ class MonoDataset(data.Dataset):
             )
 
         self.load_depth = self.check_depth()
+        self.load_pose = False
 
     def preprocess(self, inputs, color_aug):
         """Resize colour images to the required scales and augment if required
@@ -140,9 +141,10 @@ class MonoDataset(data.Dataset):
 
         folder, frame_index, side = self.index_to_folder_and_frame_idx(index)
 
-        poses = {}
+        # poses = {}
         if type(self).__name__ in [
-            "KITTIRawPoseDataset",
+            # "KITTIRawPoseDataset",
+            "",
         ]:
             inputs.update(self.get_colors(folder, frame_index, side, do_flip))
         else:
@@ -152,18 +154,26 @@ class MonoDataset(data.Dataset):
                     inputs[("color", i, -1)] = self.get_color(
                         folder, frame_index, other_side, do_flip
                     )
+                    if self.load_pose:
+                        inputs[(("gt_pose", i))] = self.get_pose(folder, frame_index)
                 else:
                     try:
                         inputs[("color", i, -1)] = self.get_color(
                             folder, frame_index + i, side, do_flip
                         )
+                        if self.load_pose:
+                            inputs[(("gt_pose", i))] = self.get_pose(
+                                folder, frame_index + i
+                            )
+
                     except FileNotFoundError as e:
                         if i != 0:
                             # fill with dummy values
                             inputs[("color", i, -1)] = Image.fromarray(
                                 np.zeros((100, 100, 3)).astype(np.uint8)
                             )
-                            poses[i] = None
+                            if self.load_pose:
+                                inputs[(("gt_pose", i))] = torch.eye(4)
                         else:
                             raise FileNotFoundError(
                                 f"Cannot find frame - make sure your "
@@ -205,6 +215,12 @@ class MonoDataset(data.Dataset):
         raise NotImplementedError
 
     def get_colors(folder, frame_index, side, do_flip):
+        raise NotImplementedError
+
+    def get_depth(self, folder, frame_index, side, do_flip):
+        raise NotImplementedError
+
+    def get_pose(self, folder, frame_index):
         raise NotImplementedError
 
     def index_to_folder_and_frame_idx(self, index):

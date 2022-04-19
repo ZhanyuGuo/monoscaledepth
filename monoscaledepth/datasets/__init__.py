@@ -1,1 +1,1 @@
-from .kitti_dataset import KITTIRAWDataset, KITTIRawPoseDataset, KITTIOdomDataset
+from .kitti_dataset import KITTIRAWDataset, KITTIRawPoseDataset, KITTIOdomDataset, KITTIOdomPoseDataset

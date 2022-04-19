@@ -1,18 +1,22 @@
 export CUDA_VISIBLE_DEVICES=1
 
-DATA_PATH=~/dataset/kitti_raw_pose/dataset
-LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_raw_20_14_multi
-DATASET=kitti_raw_pose
-SPLIT=kitti_raw_pose
+# DATA_PATH=~/dataset/kitti_raw_pose/dataset/
+DATA_PATH=~/dataset/KITTI_RAW/
 
-EPOCHS=20
-STEP_SIZE=15
-FREEZE_EPOCHS=15
+LOG_PATH=~/checkpoint/
+MODEL_NAME=kitti_raw_30_0_multi_sup_new
+DATASET=kitti_raw_pose
+
+# SPLIT=kitti_raw_pose
+SPLIT=eigen_zhou
+
+EPOCHS=30
+STEP_SIZE=20
+FREEZE_EPOCHS=20
 SAVE_FREQUENCY=1
 BATCH_SIZE=8
 
-SUP_EPOCHS=14
+SUP_EPOCHS=0
 POSE_WEIGHT=0.05
 
 python -m monoscaledepth.train \

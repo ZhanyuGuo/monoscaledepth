@@ -161,6 +161,7 @@ class Trainer:
         # DATA
         datasets_dict = {
             "kitti_raw_pose": datasets.KITTIRawPoseDataset,
+            "kitti_odom_pose": datasets.KITTIOdomPoseDataset,
         }
         self.dataset = datasets_dict[self.opt.dataset]
 
@@ -175,37 +176,37 @@ class Trainer:
         # fmt: on
 
         train_dataset = self.dataset(
-            self.opt.data_path,
-            train_filenames,
-            self.opt.height,
-            self.opt.width,
-            frames_to_load,
-            self.num_scales,
+            data_path=self.opt.data_path,
+            filenames=train_filenames,
+            height=self.opt.height,
+            width=self.opt.width,
+            frame_idxs=frames_to_load,
+            num_scales=self.num_scales,
             is_train=True,
             img_ext=img_ext,
         )
         self.train_loader = DataLoader(
-            train_dataset,
-            self.opt.batch_size,
-            True,
+            dataset=train_dataset,
+            batch_size=self.opt.batch_size,
+            shuffle=True,
             num_workers=self.opt.num_workers,
             pin_memory=True,
             drop_last=True,
         )
         val_dataset = self.dataset(
-            self.opt.data_path,
-            val_filenames,
-            self.opt.height,
-            self.opt.width,
-            frames_to_load,
-            self.num_scales,
+            data_path=self.opt.data_path,
+            filenames=val_filenames,
+            height=self.opt.height,
+            width=self.opt.width,
+            frame_idxs=frames_to_load,
+            num_scales=self.num_scales,
             is_train=False,
             img_ext=img_ext,
         )
         self.val_loader = DataLoader(
-            val_dataset,
-            self.opt.batch_size,
-            True,
+            dataset=val_dataset,
+            batch_size=self.opt.batch_size,
+            shuffle=True,
             num_workers=self.opt.num_workers,
             pin_memory=True,
             drop_last=True,
@@ -360,23 +361,19 @@ class Trainer:
         mono_losses = self.compute_losses(inputs, mono_outputs, is_multi=False)
 
         if not self.opt.no_multi_depth:
+            # fmt: off
             # grab poses + frames and stack for input to the multi frame network
-            relative_poses = [
-                inputs[("relative_pose", idx)] for idx in self.matching_ids[1:]
-            ]
+            relative_poses = [inputs[("relative_pose", idx)] for idx in self.matching_ids[1:]]
             relative_poses = torch.stack(relative_poses, 1)
 
             # batch x frames x 3 x h x w
-            lookup_frames = [
-                inputs[("color_aug", idx, 0)] for idx in self.matching_ids[1:]
-            ]
+            lookup_frames = [inputs[("color_aug", idx, 0)] for idx in self.matching_ids[1:]]
             lookup_frames = torch.stack(lookup_frames, 1)
 
             # apply static frame and zero cost volume augmentation
             batch_size = len(lookup_frames)
-            augmentation_mask = (
-                torch.zeros([batch_size, 1, 1, 1]).to(self.device).float()
-            )
+            augmentation_mask = (torch.zeros([batch_size, 1, 1, 1]).to(self.device).float())
+            # fmt: on
             if is_train and not self.opt.no_matching_augmentation:
                 for batch_idx in range(batch_size):
                     rand_num = random.random()
@@ -510,13 +507,12 @@ class Trainer:
                     f_i: inputs["color_aug", f_i, 0] for f_i in self.matching_ids
                 }
                 with torch.no_grad():
+                    # fmt: off
                     # compute pose from 0->-1, -1->-2, -2->-3 etc and multiply to find 0->-3
                     for fi in self.matching_ids[1:]:
                         if fi < 0:
                             pose_inputs = [pose_feats[fi], pose_feats[fi + 1]]
-                            pose_inputs = [
-                                self.models["pose_encoder"](torch.cat(pose_inputs, 1))
-                            ]
+                            pose_inputs = [self.models["pose_encoder"](torch.cat(pose_inputs, 1))]
                             axisangle, translation = self.models["pose"](pose_inputs)
                             pose = transformation_from_parameters(
                                 axisangle[:, 0], translation[:, 0], invert=True
@@ -524,15 +520,10 @@ class Trainer:
 
                             # now find 0->fi pose
                             if fi != -1:
-                                pose = torch.matmul(
-                                    pose, inputs[("relative_pose", fi + 1)]
-                                )
-
+                                pose = torch.matmul(pose, inputs[("relative_pose", fi + 1)])
                         else:
                             pose_inputs = [pose_feats[fi - 1], pose_feats[fi]]
-                            pose_inputs = [
-                                self.models["pose_encoder"](torch.cat(pose_inputs, 1))
-                            ]
+                            pose_inputs = [self.models["pose_encoder"](torch.cat(pose_inputs, 1))]
                             axisangle, translation = self.models["pose"](pose_inputs)
                             pose = transformation_from_parameters(
                                 axisangle[:, 0], translation[:, 0], invert=False
@@ -540,9 +531,7 @@ class Trainer:
 
                             # now find 0->fi pose
                             if fi != 1:
-                                pose = torch.matmul(
-                                    pose, inputs[("relative_pose", fi - 1)]
-                                )
+                                pose = torch.matmul(pose, inputs[("relative_pose", fi - 1)])
 
                         # set missing images to 0 pose
                         for batch_idx, feat in enumerate(pose_feats[fi]):
@@ -550,6 +539,7 @@ class Trainer:
                                 pose[batch_idx] *= 0
 
                         inputs[("relative_pose", fi)] = pose
+                    # fmt: on
         else:
             raise NotImplementedError
 
@@ -705,7 +695,7 @@ class Trainer:
                 )
                 consistency_loss = consistency_loss.mean()
 
-                # NOTE: To keep scale.
+                # NOTE: To keep scale aligned with the one before pose supervised.
                 if (
                     self.opt.add_pose_supervise
                     and self.epoch >= self.opt.begin_supervise_epoch
@@ -719,8 +709,6 @@ class Trainer:
                 )
                 consistency_target = 1 / consistency_target
                 outputs["consistency_target/{}".format(scale)] = consistency_target
-
-                # consistency_loss = 0  # TEST
                 losses["consistency_loss/{}".format(scale)] = consistency_loss
             else:
                 consistency_loss = 0

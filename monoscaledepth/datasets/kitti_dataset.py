@@ -13,6 +13,7 @@ os.environ["OMP_NUM_THREADS"] = "1"  # noqa F402
 import skimage.transform
 import numpy as np
 import PIL.Image as pil
+import torch
 
 from monoscaledepth.kitti_utils import generate_depth_map
 from .mono_dataset import MonoDataset
@@ -109,91 +110,30 @@ class KITTIRAWDataset(KITTIDataset):
         return depth_gt
 
 
-class KITTIRawPoseDataset(MonoDataset):
+class KITTIRawPoseDataset(KITTIDataset):
     """KITTI dataset with gt_pose for training and testing"""
-
-    RAW_WIDTH = 640
-    RAW_HEIGHT = 192
 
     def __init__(self, *args, **kwargs):
         super(KITTIRawPoseDataset, self).__init__(*args, **kwargs)
 
-    def index_to_folder_and_frame_idx(self, index):
-        """Convert index in the dataset to a folder name, frame_idx and any other bits
+        self.load_pose = True
 
-        txt file is of format:
-            2011_09_26_drive_0001_sync_02 0000000001
-            2011_09_26_drive_0001_sync_02 0000000002
-        """
-
-        folder, frame_index = self.filenames[index].split()
-        side = None
-        return folder, frame_index, side
-
-    def get_colors(self, folder, frame_index, side, do_flip):
-        if side is not None:
-            raise ValueError(
-                "KITTI with gt_pose dataset doesn't know how to deal with sides"
-            )
-
-        color = self.loader(self.get_image_path(folder, frame_index))
-        color = np.array(color)
-
-        pose_seq = self.load_pose(folder, frame_index)
-
-        w = color.shape[1] // 3
-        inputs = {}
-
-        inputs[("color", -1, -1)] = pil.fromarray(color[:, :w])
-        inputs[("color", 0, -1)] = pil.fromarray(color[:, w : 2 * w])
-        inputs[("color", 1, -1)] = pil.fromarray(color[:, 2 * w :])
-
-        if do_flip:
-            for key in inputs:
-                inputs[key] = inputs[key].transpose(pil.FLIP_LEFT_RIGHT)
-
-        inputs[("gt_pose", -1)] = pose_seq[0]
-        inputs[("gt_pose", 0)] = pose_seq[1]
-        inputs[("gt_pose", 1)] = pose_seq[2]
-
-        return inputs
-
-    def load_intrinsics(self, folder, frame_index):
-        camera_file = os.path.join(
-            self.data_path, folder, "{}_cam.txt".format(frame_index)
+    def get_image_path(self, folder, frame_index, side):
+        f_str = "{:010d}{}".format(frame_index, self.img_ext)
+        image_path = os.path.join(
+            self.data_path, folder, "image_0{}/data".format(self.side_map[side]), f_str
         )
-        camera = np.loadtxt(camera_file, delimiter=",")
-        fx = camera[0]
-        fy = camera[4]
-        u0 = camera[2]
-        v0 = camera[5]
-        intrinsics = np.array(
-            [[fx, 0, u0, 0], [0, fy, v0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
-        ).astype(np.float32)
+        return image_path
 
-        intrinsics[0, :] /= self.RAW_WIDTH
-        intrinsics[1, :] /= self.RAW_HEIGHT
-        return intrinsics
-
-    def load_pose(self, folder, frame_index):
-        pose_file = os.path.join(
-            self.data_path, folder, "{}_pose.txt".format(frame_index)
-        )
+    def get_pose(self, folder, frame_index):
+        f_str = "{:010d}.txt".format(frame_index)
+        pose_file = os.path.join(self.data_path, folder, "poses", f_str)
         with open(pose_file, "r") as f:
-            lines = f.readlines()
-
-        pose_seq = []
-        for line in lines:
+            line = f.readline()
             pose = np.array(line.split(), dtype="float32").reshape((4, 4))
-            pose_seq.append(pose)
+            pose = torch.from_numpy(pose)
 
-        return pose_seq
-
-    def check_depth(self):
-        return False
-
-    def get_image_path(self, folder, frame_index):
-        return os.path.join(self.data_path, folder, "{}.jpg".format(frame_index))
+        return pose
 
 
 class KITTIOdomDataset(KITTIDataset):
@@ -211,3 +151,122 @@ class KITTIOdomDataset(KITTIDataset):
             f_str,
         )
         return image_path
+
+
+class KITTIOdomPoseDataset(KITTIDataset):
+    """KITTI dataset for odometry with gt_pose for training and testing"""
+
+    def __init__(self, *args, **kwargs):
+        super(KITTIOdomPoseDataset, self).__init__(*args, **kwargs)
+
+        self.load_pose = True
+
+    def get_image_path(self, folder, frame_index, side):
+        f_str = "{:06d}{}".format(frame_index, self.img_ext)
+        image_path = os.path.join(
+            self.data_path,
+            "sequences/{:02d}".format(int(folder)),
+            "image_{}".format(self.side_map[side]),
+            f_str,
+        )
+        return image_path
+
+    def get_pose(self, folder, frame_index):
+        pose_file = os.path.join(
+            self.data_path,
+            "poses/{:02d}.txt".format(int(folder)),
+        )
+        with open(pose_file, "r") as f:
+            lines = f.readlines()
+            line = lines[frame_index][:-1] + " 0 0 0 1"
+            pose = np.array(line.split(), dtype="float32").reshape((4, 4))
+            pose = torch.from_numpy(pose)
+
+        return pose
+
+
+# class KITTIRawPoseDataset(MonoDataset):
+#     """KITTI dataset with gt_pose for training and testing"""
+
+#     RAW_WIDTH = 640
+#     RAW_HEIGHT = 192
+
+#     def __init__(self, *args, **kwargs):
+#         super(KITTIRawPoseDataset, self).__init__(*args, **kwargs)
+
+#     def index_to_folder_and_frame_idx(self, index):
+#         """Convert index in the dataset to a folder name, frame_idx and any other bits
+
+#         txt file is of format:
+#             2011_09_26_drive_0001_sync_02 0000000001
+#             2011_09_26_drive_0001_sync_02 0000000002
+#         """
+
+#         folder, frame_index = self.filenames[index].split()
+#         side = None
+#         return folder, frame_index, side
+
+#     def get_colors(self, folder, frame_index, side, do_flip):
+#         if side is not None:
+#             raise ValueError(
+#                 "KITTI with gt_pose dataset doesn't know how to deal with sides"
+#             )
+
+#         color = self.loader(self.get_image_path(folder, frame_index))
+#         color = np.array(color)
+
+#         pose_seq = self.load_pose(folder, frame_index)
+
+#         w = color.shape[1] // 3
+#         inputs = {}
+
+#         inputs[("color", -1, -1)] = pil.fromarray(color[:, :w])
+#         inputs[("color", 0, -1)] = pil.fromarray(color[:, w : 2 * w])
+#         inputs[("color", 1, -1)] = pil.fromarray(color[:, 2 * w :])
+
+#         if do_flip:
+#             for key in inputs:
+#                 inputs[key] = inputs[key].transpose(pil.FLIP_LEFT_RIGHT)
+
+#         inputs[("gt_pose", -1)] = pose_seq[0]
+#         inputs[("gt_pose", 0)] = pose_seq[1]
+#         inputs[("gt_pose", 1)] = pose_seq[2]
+
+#         return inputs
+
+#     def load_intrinsics(self, folder, frame_index):
+#         camera_file = os.path.join(
+#             self.data_path, folder, "{}_cam.txt".format(frame_index)
+#         )
+#         camera = np.loadtxt(camera_file, delimiter=",")
+#         fx = camera[0]
+#         fy = camera[4]
+#         u0 = camera[2]
+#         v0 = camera[5]
+#         intrinsics = np.array(
+#             [[fx, 0, u0, 0], [0, fy, v0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+#         ).astype(np.float32)
+
+#         intrinsics[0, :] /= self.RAW_WIDTH
+#         intrinsics[1, :] /= self.RAW_HEIGHT
+#         return intrinsics
+
+#     def load_pose(self, folder, frame_index):
+#         pose_file = os.path.join(
+#             self.data_path, folder, "{}_pose.txt".format(frame_index)
+#         )
+#         with open(pose_file, "r") as f:
+#             lines = f.readlines()
+
+#         pose_seq = []
+#         for line in lines:
+#             pose = np.array(line.split(), dtype="float32").reshape((4, 4))
+#             pose_seq.append(pose)
+
+#         return pose_seq
+
+#     def check_depth(self):
+#         return False
+
+#     def get_image_path(self, folder, frame_index):
+#         return os.path.join(self.data_path, folder, "{}.jpg".format(frame_index))
