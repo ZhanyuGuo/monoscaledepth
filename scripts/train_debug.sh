@@ -1,13 +1,14 @@
 export CUDA_VISIBLE_DEVICES=0
 
-DATA_PATH=~/dataset/kitti_raw_pose/dataset/
+DATA_PATH=~/dataset/KITTI_RAW/
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_raw_20_mono_sup_debug
+MODEL_NAME=kitti_raw_20_multi_sup_new_debug
 DATASET=kitti_raw_pose
-SPLIT=kitti_raw_pose
+SPLIT=eigen_zhou
 
 EPOCHS=20
 STEP_SIZE=15
+FREEZE_EPOCHS=15
 SAVE_FREQUENCY=1
 BATCH_SIZE=3
 
@@ -26,8 +27,8 @@ python3 -m debugpy --listen 5678 --wait-for-client -m monoscaledepth.train \
    --batch_size $BATCH_SIZE \
    --num_epochs $EPOCHS \
    --scheduler_step_size $STEP_SIZE \
+   --freeze_teacher_epoch $FREEZE_EPOCHS \
    --save_frequency $SAVE_FREQUENCY \
-   --no_multi_depth \
    --add_pose_supervise \
-   --begin_supervise_epoch $SUP_EPOCHS
+   --begin_supervise_epoch $SUP_EPOCHS \
    --pose_weight $POSE_WEIGHT \

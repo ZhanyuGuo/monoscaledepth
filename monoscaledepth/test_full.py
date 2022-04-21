@@ -77,8 +77,8 @@ def load_and_preprocess_intrinsics(intrinsics_path, resize_width, resize_height)
     for scale in range(4):
         K = K_identity.copy()
 
-        K[0, :] *= resize_width // (2 ** scale)
-        K[1, :] *= resize_height // (2 ** scale)
+        K[0, :] *= resize_width // (2**scale)
+        K[1, :] *= resize_height // (2**scale)
 
         invK = torch.Tensor(np.linalg.pinv(K)).unsqueeze(0)
         K = torch.Tensor(K).unsqueeze(0)
@@ -376,7 +376,7 @@ def main(args):
         )
         im = pil.fromarray((mono_reprojection_loss_mask * 255).astype(np.uint8))
         name_dest_im = os.path.join(
-            directory, "{}_{}_my.jpeg".format(output_name, "mono_mask")
+            directory, "{}_{}_full.jpeg".format(output_name, "mono_mask")
         )
         im.save(name_dest_im)
         print("-> Saved output image to {}".format(name_dest_im))
@@ -384,7 +384,7 @@ def main(args):
         consistency_mask = consistency_mask.squeeze().cpu().numpy()
         im = pil.fromarray((consistency_mask * 255).astype(np.uint8))
         name_dest_im = os.path.join(
-            directory, "{}_{}_my.jpeg".format(output_name, "consistency_mask")
+            directory, "{}_{}_full.jpeg".format(output_name, "consistency_mask")
         )
         im.save(name_dest_im)
         print("-> Saved output image to {}".format(name_dest_im))
@@ -396,7 +396,7 @@ def main(args):
         mono_warped_resized = mono_warped_resized.transpose((1, 2, 0))
         im = pil.fromarray((mono_warped_resized * 255).astype(np.uint8))
         name_dest_im = os.path.join(
-            directory, "{}_{}_my.jpeg".format(output_name, "mono_warped")
+            directory, "{}_{}_full.jpeg".format(output_name, "mono_warped")
         )
         im.save(name_dest_im)
         print("-> Saved output image to {}".format(name_dest_im))
@@ -408,7 +408,7 @@ def main(args):
         multi_warped_resized = multi_warped_resized.transpose((1, 2, 0))
         im = pil.fromarray((multi_warped_resized * 255).astype(np.uint8))
         name_dest_im = os.path.join(
-            directory, "{}_{}_my.jpeg".format(output_name, "multi_warped")
+            directory, "{}_{}_full.jpeg".format(output_name, "multi_warped")
         )
         im.save(name_dest_im)
         print("-> Saved output image to {}".format(name_dest_im))
@@ -420,7 +420,7 @@ def main(args):
         colormapped_im = (mapper.to_rgba(mono_disp)[:, :, :3] * 255).astype(np.uint8)
         im = pil.fromarray(colormapped_im)
         name_dest_im = os.path.join(
-            directory, "{}_{}_my.jpeg".format(output_name, "mono_disp")
+            directory, "{}_{}_full.jpeg".format(output_name, "mono_disp")
         )
         im.save(name_dest_im)
         print("-> Saved output image to {}".format(name_dest_im))
@@ -432,17 +432,18 @@ def main(args):
         colormapped_im = (mapper.to_rgba(multi_disp)[:, :, :3] * 255).astype(np.uint8)
         im = pil.fromarray(colormapped_im)
         name_dest_im = os.path.join(
-            directory, "{}_{}_my.jpeg".format(output_name, "multi_disp")
+            directory, "{}_{}_full.jpeg".format(output_name, "multi_disp")
         )
         im.save(name_dest_im)
         print("-> Saved output image to {}".format(name_dest_im))
 
-        # name_dest_npy = os.path.join(directory, "{}_disp.npy".format(output_name))
-        # np.save(name_dest_npy, sigmoid_output.cpu().numpy())
-        # name_dest_npy = os.path.join(
-        #     directory, "{}_disp_resized.npy".format(output_name)
-        # )
-        # np.save(name_dest_npy, sigmoid_output_resized)
+        name_dest_npy = os.path.join(directory, "{}_mono_disp_resized.npy".format(output_name))
+        np.save(name_dest_npy, mono_sigmoid_output_resized)
+        print("-> Saved npy file to {}".format(name_dest_npy))
+
+        name_dest_npy = os.path.join(directory, "{}_multi_disp_resized.npy".format(output_name))
+        np.save(name_dest_npy, multi_sigmoid_output_resized)
+        print("-> Saved npy file to {}".format(name_dest_npy))
 
 
 if __name__ == "__main__":

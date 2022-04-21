@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 MODEL_PATH=~/checkpoint/kitti_raw_20_mono_sup_new/models/weights_19/
 DATA_PATH=~/dataset/KITTI_RAW

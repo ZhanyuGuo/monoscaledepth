@@ -169,8 +169,6 @@ def test_simple(args):
     )
     mono_depth_decoder.load_state_dict(mono_decoder_dict)
 
-
-
     # Setting states of networks
     if not args.no_multi_depth:
         encoder.eval()
@@ -268,6 +266,11 @@ def test_simple(args):
             colormapped_im = (mapper.to_rgba(toplot)[:, :, :3] * 255).astype(np.uint8)
             im = pil.fromarray(colormapped_im)
 
+            if args.no_multi_depth:
+                output_name += "_mono"
+            else:
+                output_name += "_multi"
+            
             name_dest_im = os.path.join(
                 directory, "{}_{}.jpeg".format(output_name, plot_name)
             )

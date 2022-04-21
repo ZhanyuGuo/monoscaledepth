@@ -4,20 +4,22 @@ export CUDA_VISIBLE_DEVICES=1
 DATA_PATH=~/dataset/KITTI_RAW/
 
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_raw_30_0_multi_sup_new
+MODEL_NAME=kitti_raw_40_0_multi_sup_new
 DATASET=kitti_raw_pose
 
 # SPLIT=kitti_raw_pose
 SPLIT=eigen_zhou
 
-EPOCHS=30
-STEP_SIZE=20
-FREEZE_EPOCHS=20
+EPOCHS=40
+STEP_SIZE=15
+FREEZE_EPOCHS=15
 SAVE_FREQUENCY=1
 BATCH_SIZE=8
 
 SUP_EPOCHS=0
 POSE_WEIGHT=0.05
+
+# WEIGHT_FOLDER=~/checkpoint/kitti_raw_30_0_multi_sup_new/models/weights_15
 
 python -m monoscaledepth.train \
    --data_path $DATA_PATH \
@@ -33,3 +35,5 @@ python -m monoscaledepth.train \
    --add_pose_supervise \
    --begin_supervise_epoch $SUP_EPOCHS \
    --pose_weight $POSE_WEIGHT \
+   # --load_weights_folder $WEIGHT_FOLDER \
+   # --mono_weights_folder $WEIGHT_FOLDER \
