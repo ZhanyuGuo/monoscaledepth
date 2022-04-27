@@ -1,9 +1,11 @@
+# This script is to train the model with multi depth and with pose supervised.
+
 export CUDA_VISIBLE_DEVICES=0
 
 DATA_PATH=~/dataset/KITTI_RAW/
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_raw_20_multi_sup_new_debug
-DATASET=kitti_raw_pose
+MODEL_NAME=kitti_raw_20_multi_sup_semantic_debug
+DATASET=kitti_raw_pose_semantic
 SPLIT=eigen_zhou
 
 EPOCHS=20
@@ -32,3 +34,4 @@ python3 -m debugpy --listen 5678 --wait-for-client -m monoscaledepth.train \
    --add_pose_supervise \
    --begin_supervise_epoch $SUP_EPOCHS \
    --pose_weight $POSE_WEIGHT \
+   --use_semantic \

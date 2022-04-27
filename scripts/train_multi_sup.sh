@@ -1,16 +1,18 @@
+# This script is to train the model with multi depth, with pose supervised.
+
 export CUDA_VISIBLE_DEVICES=1
 
 # DATA_PATH=~/dataset/kitti_raw_pose/dataset/
 DATA_PATH=~/dataset/KITTI_RAW/
 
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_raw_40_0_multi_sup_new
+MODEL_NAME=kitti_raw_20_0_multi_sup_new_2
 DATASET=kitti_raw_pose
 
 # SPLIT=kitti_raw_pose
 SPLIT=eigen_zhou
 
-EPOCHS=40
+EPOCHS=20
 STEP_SIZE=15
 FREEZE_EPOCHS=15
 SAVE_FREQUENCY=1

@@ -85,6 +85,7 @@ class MonoDataset(data.Dataset):
 
         self.load_depth = self.check_depth()
         self.load_pose = False
+        self.load_semantic = False
 
     def preprocess(self, inputs, color_aug):
         """Resize colour images to the required scales and augment if required
@@ -156,6 +157,8 @@ class MonoDataset(data.Dataset):
                     )
                     if self.load_pose:
                         inputs[(("gt_pose", i))] = self.get_pose(folder, frame_index)
+                    if self.load_semantic:
+                        inputs[("semantic_mask", i)] = self.get_sementic(folder, frame_index)
                 else:
                     try:
                         inputs[("color", i, -1)] = self.get_color(
@@ -163,6 +166,10 @@ class MonoDataset(data.Dataset):
                         )
                         if self.load_pose:
                             inputs[(("gt_pose", i))] = self.get_pose(
+                                folder, frame_index + i
+                            )
+                        if self.load_semantic:
+                            inputs[("semantic_mask", i)] = self.get_sementic(
                                 folder, frame_index + i
                             )
 
@@ -174,6 +181,8 @@ class MonoDataset(data.Dataset):
                             )
                             if self.load_pose:
                                 inputs[(("gt_pose", i))] = torch.eye(4)
+                            if self.load_semantic:
+                                inputs[("semantic_mask", i)] = torch.zeros((self.height, self.width))
                         else:
                             raise FileNotFoundError(
                                 f"Cannot find frame - make sure your "
@@ -221,6 +230,9 @@ class MonoDataset(data.Dataset):
         raise NotImplementedError
 
     def get_pose(self, folder, frame_index):
+        raise NotImplementedError
+
+    def get_sementic(self, folder, frame_index):
         raise NotImplementedError
 
     def index_to_folder_and_frame_idx(self, index):

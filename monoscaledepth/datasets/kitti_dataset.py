@@ -14,6 +14,7 @@ import skimage.transform
 import numpy as np
 import PIL.Image as pil
 import torch
+import torch.nn.functional as F
 
 from monoscaledepth.kitti_utils import generate_depth_map
 from .mono_dataset import MonoDataset
@@ -134,6 +135,38 @@ class KITTIRawPoseDataset(KITTIDataset):
             pose = torch.from_numpy(pose)
 
         return pose
+
+
+class KITTIRawPoseSemanticDataset(KITTIRawPoseDataset):
+    """KITTI dataset with gt_pose and semantic masks for training and testing"""
+
+    def __init__(self, *args, **kwargs):
+        super(KITTIRawPoseSemanticDataset, self).__init__(*args, **kwargs)
+
+        self.load_semantic = True
+
+    def get_sementic(self, folder, frame_index):
+        h, w = 192, 640
+        # classes_file = "{:010d}_classes.npy".format(frame_index)
+        masks_file = "{:010d}_masks.npy".format(frame_index)
+
+        # classes_path = os.path.join(self.data_path, folder, "semantics", classes_file)
+        masks_path = os.path.join(self.data_path, folder, "semantics", masks_file)
+
+        masks = np.load(masks_path)
+        masks = torch.from_numpy(masks)
+        # 1
+        masks = masks.sum(dim=0, keepdim=True) > 0
+        if masks.shape == (1, ):
+            masks = torch.zeros((1, h, w))
+
+        masks = F.interpolate(
+            masks.unsqueeze(0).float(),
+            [h, w],
+        )
+        masks = masks.squeeze(0)
+
+        return masks
 
 
 class KITTIOdomDataset(KITTIDataset):

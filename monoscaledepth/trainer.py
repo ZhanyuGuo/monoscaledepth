@@ -161,6 +161,7 @@ class Trainer:
         # DATA
         datasets_dict = {
             "kitti_raw_pose": datasets.KITTIRawPoseDataset,
+            "kitti_raw_pose_semantic": datasets.KITTIRawPoseSemanticDataset,
             "kitti_odom_pose": datasets.KITTIOdomPoseDataset,
         }
         self.dataset = datasets_dict[self.opt.dataset]
@@ -678,6 +679,24 @@ class Trainer:
                         1 - outputs["augmentation_mask"]
                     )
                 consistency_mask = (1 - reprojection_loss_mask).float()
+                
+                if self.opt.use_semantic:
+                    # ---- 1 ----
+                    consistency_mask = inputs[("semantic_mask", 0)] # b x 1 x h x w
+                    reprojection_loss_mask = 1 - consistency_mask
+                    
+                    # # ---- 2 ----
+                    # semantic_mask = inputs[("semantic_mask", 0)]  # b x c x h x w
+                    # consistency_mask = consistency_mask * semantic_mask # b x c x h x w
+
+                    # semantic_sum = semantic_mask.sum(dim=[2, 3]) # b x c
+                    # consistency_sum = consistency_mask.sum(dim=[2, 3]) # b x c
+
+                    # threshold = 0.5
+                    # # b x c2 x h x w
+                    # consistency_mask = consistency_mask[:, consistency_sum / semantic_sum > threshold, :, :]
+                    # # b x 1 x h x w
+                    # consistency_mask = consistency_mask.sum(dim=1, keepdim=True) > 0
 
             reprojection_loss = reprojection_loss * reprojection_loss_mask
             reprojection_loss = reprojection_loss.sum() / (

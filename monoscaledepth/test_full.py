@@ -77,8 +77,8 @@ def load_and_preprocess_intrinsics(intrinsics_path, resize_width, resize_height)
     for scale in range(4):
         K = K_identity.copy()
 
-        K[0, :] *= resize_width // (2**scale)
-        K[1, :] *= resize_height // (2**scale)
+        K[0, :] *= resize_width // (2 ** scale)
+        K[1, :] *= resize_height // (2 ** scale)
 
         invK = torch.Tensor(np.linalg.pinv(K)).unsqueeze(0)
         K = torch.Tensor(K).unsqueeze(0)
@@ -437,11 +437,15 @@ def main(args):
         im.save(name_dest_im)
         print("-> Saved output image to {}".format(name_dest_im))
 
-        name_dest_npy = os.path.join(directory, "{}_mono_disp_resized.npy".format(output_name))
+        name_dest_npy = os.path.join(
+            directory, "{}_mono_disp_resized.npy".format(output_name)
+        )
         np.save(name_dest_npy, mono_sigmoid_output_resized)
         print("-> Saved npy file to {}".format(name_dest_npy))
 
-        name_dest_npy = os.path.join(directory, "{}_multi_disp_resized.npy".format(output_name))
+        name_dest_npy = os.path.join(
+            directory, "{}_multi_disp_resized.npy".format(output_name)
+        )
         np.save(name_dest_npy, multi_sigmoid_output_resized)
         print("-> Saved npy file to {}".format(name_dest_npy))
 

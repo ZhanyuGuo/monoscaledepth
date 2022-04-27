@@ -1,14 +1,14 @@
-# This script is to train the model with multi depth and with pose supervised on kitti odom.
+# This script is to train the model with multi depth, with pose supervised, and with semantic masks.
 
 export CUDA_VISIBLE_DEVICES=1
 
-DATA_PATH=~/dataset/KITTI_ODOM/dataset
+DATA_PATH=~/dataset/KITTI_RAW/
 
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_odom_20_multi_sup_new
-DATASET=kitti_odom_pose
+MODEL_NAME=kitti_raw_20_0_multi_sup_semantic
+DATASET=kitti_raw_pose_semantic
 
-SPLIT=odom
+SPLIT=eigen_zhou
 
 EPOCHS=20
 STEP_SIZE=15
@@ -16,8 +16,9 @@ FREEZE_EPOCHS=15
 SAVE_FREQUENCY=1
 BATCH_SIZE=8
 
-SUP_EPOCHS=10
+SUP_EPOCHS=0
 POSE_WEIGHT=0.05
+
 
 python -m monoscaledepth.train \
    --data_path $DATA_PATH \
@@ -33,3 +34,4 @@ python -m monoscaledepth.train \
    --add_pose_supervise \
    --begin_supervise_epoch $SUP_EPOCHS \
    --pose_weight $POSE_WEIGHT \
+   --use_semantic \

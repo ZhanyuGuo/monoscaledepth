@@ -1,3 +1,5 @@
+# This script is to train the model without multi depth and with pose supervised.
+
 export CUDA_VISIBLE_DEVICES=1
 
 # DATA_PATH=~/dataset/kitti_raw_pose/dataset

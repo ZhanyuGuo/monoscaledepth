@@ -1,10 +1,10 @@
+# This script is to test quality fully by using target image,
+# source image, camera intrinsics. Visualize the result.
+
 export CUDA_VISIBLE_DEVICES=0
 
 # TARGET_IMG_PATH=assets/0000000191.jpg
 # SOURCE_IMG_PATH=assets/0000000190.jpg
-
-# TARGET_IMG_PATH=assets/0000000387.png
-# SOURCE_IMG_PATH=assets/0000000386.png
 
 # TARGET_IMG_PATH=assets/0000000167.jpg
 # SOURCE_IMG_PATH=assets/0000000166.jpg

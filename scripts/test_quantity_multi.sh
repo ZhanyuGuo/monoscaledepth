@@ -1,6 +1,8 @@
-export CUDA_VISIBLE_DEVICES=1
+# This script is to test quantity using multi depth.
 
-MODEL_PATH=~/checkpoint/kitti_raw_30_0_multi_sup_new_cont/models/weights_14/
+export CUDA_VISIBLE_DEVICES=0
+
+MODEL_PATH=~/checkpoint/kitti_odom_20_multi_sup_new/models/weights_19/
 DATA_PATH=~/dataset/KITTI_RAW
 
 python -m monoscaledepth.evaluate_depth \

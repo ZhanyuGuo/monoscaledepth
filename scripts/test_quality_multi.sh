@@ -1,3 +1,5 @@
+# This script is to test quality using multi depth.
+
 export CUDA_VISIBLE_DEVICES=0
 
 TARGET_IMG_PATH=assets/0000000019.jpg

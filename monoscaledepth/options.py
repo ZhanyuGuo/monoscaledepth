@@ -103,6 +103,7 @@ class MonoscaledepthOptions:
             default="kitti_raw_pose",
             choices=[
                 "kitti_raw_pose",
+                "kitti_raw_pose_semantic",
                 "kitti_odom_pose",
             ],
         )
@@ -202,6 +203,11 @@ class MonoscaledepthOptions:
             "--no_multi_depth",
             action="store_true",
             help="If set, only use mono depth",
+        )
+        self.parser.add_argument(
+            "--use_semantic",
+            action="store_true",
+            help="If set, use semantics mask.",
         )
 
         # SYSTEM options

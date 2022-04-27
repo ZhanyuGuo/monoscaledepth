@@ -140,3 +140,4 @@ cython_debug/
 *.npz
 *.npy
 *.obj
+assets/*.jpeg

@@ -1,3 +1,5 @@
+# This script is to test quantity using mono depth.
+
 export CUDA_VISIBLE_DEVICES=0
 
 MODEL_PATH=~/checkpoint/kitti_raw_20_mono_sup_new/models/weights_19/

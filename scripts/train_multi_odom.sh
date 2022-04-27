@@ -1,11 +1,11 @@
-# This script is to train the model with multi depth and with pose supervised on kitti odom.
+# This script is to train the model with multi depth and without pose supervised on kitti odom.
 
 export CUDA_VISIBLE_DEVICES=1
 
 DATA_PATH=~/dataset/KITTI_ODOM/dataset
 
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_odom_20_multi_sup_new
+MODEL_NAME=kitti_odom_20_multi_new
 DATASET=kitti_odom_pose
 
 SPLIT=odom
@@ -14,10 +14,7 @@ EPOCHS=20
 STEP_SIZE=15
 FREEZE_EPOCHS=15
 SAVE_FREQUENCY=1
-BATCH_SIZE=8
-
-SUP_EPOCHS=10
-POSE_WEIGHT=0.05
+BATCH_SIZE=10
 
 python -m monoscaledepth.train \
    --data_path $DATA_PATH \
@@ -30,6 +27,3 @@ python -m monoscaledepth.train \
    --scheduler_step_size $STEP_SIZE \
    --freeze_teacher_epoch $FREEZE_EPOCHS \
    --save_frequency $SAVE_FREQUENCY \
-   --add_pose_supervise \
-   --begin_supervise_epoch $SUP_EPOCHS \
-   --pose_weight $POSE_WEIGHT \
