@@ -12,6 +12,12 @@ source ~/.bashrc
 conda activate manydepth
 ```
 
+```bash
+# tensorboard
+ssh -L 16006:127.0.0.1:6006 -p 36045 -i ~/gzy_rsa gzy@ae61b2716f3e6691.natapp.cc
+tensorboard --logdir <log_dir>
+```
+
 ### 两帧图片生成深度图
 
 ```bash

@@ -679,24 +679,31 @@ class Trainer:
                         1 - outputs["augmentation_mask"]
                     )
                 consistency_mask = (1 - reprojection_loss_mask).float()
-                
+
                 if self.opt.use_semantic:
-                    # ---- 1 ----
-                    consistency_mask = inputs[("semantic_mask", 0)] # b x 1 x h x w
-                    reprojection_loss_mask = 1 - consistency_mask
+                    # # ---- 1 ----
+                    # consistency_mask = inputs[("semantic_mask", 0)] # b x 1 x h x w
+                    # reprojection_loss_mask = 1 - consistency_mask
+
+                    # ---- 2 ----
+                    threshold = 0.5
+                    max_instances = 5
                     
-                    # # ---- 2 ----
-                    # semantic_mask = inputs[("semantic_mask", 0)]  # b x c x h x w
-                    # consistency_mask = consistency_mask * semantic_mask # b x c x h x w
-
-                    # semantic_sum = semantic_mask.sum(dim=[2, 3]) # b x c
-                    # consistency_sum = consistency_mask.sum(dim=[2, 3]) # b x c
-
-                    # threshold = 0.5
-                    # # b x c2 x h x w
-                    # consistency_mask = consistency_mask[:, consistency_sum / semantic_sum > threshold, :, :]
-                    # # b x 1 x h x w
-                    # consistency_mask = consistency_mask.sum(dim=1, keepdim=True) > 0
+                    semantic_masks = inputs[("semantic_mask", 0)]  # b x c x h x w
+                    con_and_sem = consistency_mask * semantic_masks
+                    and_sum = con_and_sem.sum(dim=[2, 3])
+                    sem_sum = semantic_masks.sum(dim=[2, 3]) + 1e-7
+                    indices = (and_sum / sem_sum) > threshold
+                    # fmt: off
+                    for batch_idx in range(self.opt.batch_size):
+                        for mask_idx in range(max_instances):
+                            if indices[batch_idx, mask_idx]:
+                                consistency_mask[batch_idx] = ((consistency_mask[batch_idx] + semantic_masks[batch_idx, mask_idx : mask_idx + 1]) > 0).float()
+                            else:
+                                consistency_mask[batch_idx] = consistency_mask[batch_idx] * (1 - semantic_masks[batch_idx, mask_idx : mask_idx + 1])
+                    # fmt: on
+                    reprojection_loss_mask = 1 - consistency_mask
+                    pass
 
             reprojection_loss = reprojection_loss * reprojection_loss_mask
             reprojection_loss = reprojection_loss.sum() / (

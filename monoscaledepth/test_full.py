@@ -449,6 +449,12 @@ def main(args):
         np.save(name_dest_npy, multi_sigmoid_output_resized)
         print("-> Saved npy file to {}".format(name_dest_npy))
 
+        name_dest_npy = os.path.join(
+            directory, "{}_consistency.npy".format(output_name)
+        )
+        np.save(name_dest_npy, consistency_mask)
+        print("-> Saved npy file to {}".format(name_dest_npy))
+
 
 if __name__ == "__main__":
     args = parse_args()

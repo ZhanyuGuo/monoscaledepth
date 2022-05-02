@@ -146,25 +146,30 @@ class KITTIRawPoseSemanticDataset(KITTIRawPoseDataset):
         self.load_semantic = True
 
     def get_sementic(self, folder, frame_index):
-        h, w = 192, 640
-        # classes_file = "{:010d}_classes.npy".format(frame_index)
+        h, w, max_instances = 192, 640, 5
         masks_file = "{:010d}_masks.npy".format(frame_index)
-
-        # classes_path = os.path.join(self.data_path, folder, "semantics", classes_file)
         masks_path = os.path.join(self.data_path, folder, "semantics", masks_file)
-
         masks = np.load(masks_path)
         masks = torch.from_numpy(masks)
-        # 1
-        masks = masks.sum(dim=0, keepdim=True) > 0
-        if masks.shape == (1, ):
+
+        # No instance case.
+        if masks.shape == (0,):
             masks = torch.zeros((1, h, w))
 
+        # Resize masks.
         masks = F.interpolate(
             masks.unsqueeze(0).float(),
             [h, w],
         )
         masks = masks.squeeze(0)
+
+        # # method 1: Or all the masks.
+        # masks = masks.sum(dim=0, keepdim=True) > 0
+
+        # method 2: TODO fill with zeros up to `max_instances`
+        zeros = torch.zeros((max_instances, h, w))
+        masks = torch.cat([masks, zeros], dim=0)
+        masks = masks[:max_instances]
 
         return masks
 
