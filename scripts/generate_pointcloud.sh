@@ -8,10 +8,11 @@
 
 # NOTE You should run `test_quality_*.sh` first to generate a depth file.
 
-TARGET_IMG_PATH=assets/0000000019.jpg
+# TARGET_IMG_PATH=assets/0000000019.jpg
+TARGET_IMG_PATH=assets/0000000167.jpg
 
 # DEPTH_PATH=assets/0000000019_multi_disp_resized.npy
-DEPTH_PATH=assets/0000000019_disp_resized.npy
+DEPTH_PATH=assets/0000000167_multi_disp_resized.npy
 
 INTRINSICS=assets/test_sequence_intrinsics.json
 SAVE_PATH=assets/
