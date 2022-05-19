@@ -6,7 +6,7 @@
 # Old
 ssh -p 99 gzy@192.168.111.137
 # New
-ssh -p 36045 -i ~/gzy_rsa gzy@ae61b2716f3e6691.natapp.cc
+ssh -p 36045 -i ~/Workspace/gzy_rsa gzy@ae61b2716f3e6691.natapp.cc
 
 source ~/.bashrc
 conda activate manydepth
@@ -14,8 +14,11 @@ conda activate manydepth
 
 ```bash
 # tensorboard
-ssh -L 16006:127.0.0.1:6006 -p 36045 -i ~/gzy_rsa gzy@ae61b2716f3e6691.natapp.cc
+ssh -L 16006:127.0.0.1:6006 -p 36045 -i ~/Workspace/gzy_rsa gzy@ae61b2716f3e6691.natapp.cc
 tensorboard --logdir <log_dir>
+
+# local
+127.0.0.1:16006
 ```
 
 ### 两帧图片生成深度图

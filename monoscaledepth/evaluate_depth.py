@@ -68,7 +68,7 @@ def evaluate(opt):
     """Evaluates a pretrained model using a specified test set"""
 
     MIN_DEPTH = 1e-3
-    MAX_DEPTH = 80
+    MAX_DEPTH = 80  # 80
 
     frames_to_load = [0]
     if opt.use_future_frame:

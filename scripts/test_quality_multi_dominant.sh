@@ -1,12 +1,20 @@
 # This script is to test quality using multi depth.
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
-TARGET_IMG_PATH=assets/10563.jpg
-SOURCE_IMG_PATH=assets/10562.jpg
+
+# TARGET_IMG_PATH=assets/10563.jpg
+# SOURCE_IMG_PATH=assets/10562.jpg
+
+# TARGET_IMG_PATH=assets/10764.jpg
+# SOURCE_IMG_PATH=assets/10763.jpg
+
+TARGET_IMG_PATH=assets/10902.jpg
+SOURCE_IMG_PATH=assets/10901.jpg
+
 INTRINSICS=assets/dominant_intrinsics.json
 
-MODEL_PATH=~/checkpoint/dominant_sup_20/models/weights_19/
+MODEL_PATH=~/checkpoint/dominant_sup_50/models/weights_49/
 
 python -m monoscaledepth.test_simple \
     --target_image_path $TARGET_IMG_PATH \
