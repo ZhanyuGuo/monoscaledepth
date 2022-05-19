@@ -139,7 +139,7 @@ if __name__ == "__main__":
         velo2cam_mat = transform_from_rot_trans(velo2cam["R"], velo2cam["T"])
         imu2velo_mat = transform_from_rot_trans(imu2velo["R"], imu2velo["T"])
         cam_2rect_mat = transform_from_rot_trans(cam2cam["R_rect_00"], np.zeros(3))
-        
+
         imu2cam = cam_2rect_mat @ velo2cam_mat @ imu2velo_mat
 
         drive_list_length = len(drive_list)

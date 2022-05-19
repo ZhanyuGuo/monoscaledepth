@@ -3,7 +3,7 @@
 export CUDA_VISIBLE_DEVICES=0
 
 # MODEL_PATH=~/checkpoint/pretrained_KITTI_MR/
-MODEL_PATH=~/checkpoint/kitti_odom_20_multi_new/models/weights_19/
+MODEL_PATH=~/checkpoint/kitti_odom_20_multi_sup_new_1/models/weights_19/
 
 DATA_PATH=~/dataset/KITTI_ODOM/dataset/
 

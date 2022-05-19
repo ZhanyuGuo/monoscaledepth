@@ -5,10 +5,6 @@ import os
 import scipy.misc
 from random import random
 
-# import sys
-# sys.path.append('../../')
-# from utils.misc import *
-
 
 class kitti_odom_loader(object):
     def __init__(
@@ -73,18 +69,20 @@ class kitti_odom_loader(object):
             image_seq.append(curr_img)
         return image_seq, zoom_x, zoom_y
 
-    def load_example(self, frames, tgt_idx, load_pose=False):
-        image_seq, zoom_x, zoom_y = self.load_image_sequence(frames, tgt_idx, self.seq_length)
-        tgt_drive, tgt_frame_id = frames[tgt_idx].split(' ')
+    def load_example(self, frames, tgt_idx):
+        image_seq, zoom_x, zoom_y = self.load_image_sequence(
+            frames, tgt_idx, self.seq_length
+        )
+        tgt_drive, tgt_frame_id = frames[tgt_idx].split(" ")
         intrinsics = self.load_intrinsics(tgt_drive, tgt_frame_id)
-        intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)        
+        intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
+
         example = {}
-        example['intrinsics'] = intrinsics
-        example['image_seq'] = image_seq
-        example['folder_name'] = tgt_drive
-        example['file_name'] = tgt_frame_id
-        if load_pose:
-            pass
+        example["intrinsics"] = intrinsics
+        example["image_seq"] = image_seq
+        example["folder_name"] = tgt_drive
+        example["file_name"] = tgt_frame_id
+
         return example
 
     def get_train_example_with_idx(self, tgt_idx):
@@ -92,21 +90,6 @@ class kitti_odom_loader(object):
             return False
         example = self.load_example(self.train_frames, tgt_idx)
         return example
-
-    # def load_frame(self, drive, frame_id):
-    #     img = self.load_image(drive, frame_id)
-    #     try:
-    #         scale_x = np.float(self.img_width)/img.shape[1]
-    #     except:
-    #         print("KITTI loading error!")
-    #         print("Drive = ", drive)
-    #         print("frame_id = ", frame_id)
-    #         raise
-    #     scale_y = np.float(self.img_height)/img.shape[0]
-    #     intrinsics = self.load_intrinsics(drive, frame_id)
-    #     intrinsics = self.scale_intrinsics(intrinsics, scale_x, scale_y)
-    #     img = self.crop_resize(img)
-    #     return img, intrinsics
 
     def load_image(self, drive, frame_id):
         img_file = os.path.join(
@@ -120,19 +103,6 @@ class kitti_odom_loader(object):
         proj_c2p, _ = self.read_calib_file(calib_file)
         intrinsics = proj_c2p[:3, :3]
         return intrinsics
-
-    # def load_gt_odom(self, drive, tgt_idx, src_idx):
-    #     pose_file = os.path.join(self.dataset_dir, 'poses', '%s.txt' % drive)
-    #     with open(pose_file, 'r') as f:
-    #         poses = f.readlines()
-    #     filler = np.array([0, 0, 0, 1]).reshape((1,4))
-    #     tgt_pose = np.array(poses[int(tgt_idx)][:-1].split(' ')).astype(np.float32).reshape(3,4)
-    #     tgt_pose = np.concatenate((tgt_pose, filler), axis=0)
-    #     src_pose = np.array(poses[int(src_idx)][:-1].split(' ')).astype(np.float32).reshape(3,4)
-    #     src_pose = np.concatenate((src_pose, filler), axis=0)
-    #     rel_pose = np.dot(np.linalg.inv(src_pose), tgt_pose)
-    #     rel_6DOF = pose_mat_to_6dof(rel_pose)
-    #     return rel_6DOF
 
     def read_calib_file(self, filepath, cid=2):
         """Read in a calibration file and parse into a dictionary."""

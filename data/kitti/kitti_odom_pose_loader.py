@@ -5,20 +5,13 @@ import os
 import scipy.misc
 from random import random
 
-# import sys
-# sys.path.append('../../')
-# from utils.misc import *
-
 
 class kitti_odom_pose_loader(object):
-    def __init__(
-        self, dataset_dir, img_height=128, img_width=416, seq_length=3, sample_gap=1
-    ):
+    def __init__(self, dataset_dir, img_height=128, img_width=416, seq_length=3):
         self.dataset_dir = dataset_dir
         self.img_height = img_height
         self.img_width = img_width
         self.seq_length = seq_length
-        self.sample_gap = sample_gap
         self.train_seqs = [0, 1, 2, 3, 4, 5, 6, 7, 8]
         self.test_seqs = [9, 10]
 
@@ -48,7 +41,7 @@ class kitti_odom_pose_loader(object):
     def is_valid_sample(self, frames, tgt_idx):
         N = len(frames)
         tgt_drive, _ = frames[tgt_idx].split(" ")
-        half_offset = int((self.seq_length - 1) / 2 * self.sample_gap)
+        half_offset = int((self.seq_length - 1) / 2)
         min_src_idx = tgt_idx - half_offset
         max_src_idx = tgt_idx + half_offset
         if min_src_idx < 0 or max_src_idx >= N:
@@ -59,10 +52,10 @@ class kitti_odom_pose_loader(object):
             return True
         return False
 
-    def load_image_sequence(self, frames, tgt_idx, seq_length, gap):
-        half_offset = int((seq_length - 1) / 2 * gap)
+    def load_image_sequence(self, frames, tgt_idx, seq_length):
+        half_offset = int((seq_length - 1) / 2)
         image_seq = []
-        for o in range(-half_offset, half_offset + 1, gap):
+        for o in range(-half_offset, half_offset + 1):
             curr_idx = tgt_idx + o
             curr_drive, curr_frame_id = frames[curr_idx].split(" ")
             curr_img = self.load_image(curr_drive, curr_frame_id)
@@ -74,23 +67,14 @@ class kitti_odom_pose_loader(object):
         return image_seq, zoom_x, zoom_y
 
     def load_example(self, frames, tgt_idx):
-        if self.sample_gap == 2:
-            n = random()
-            if n < 0.5:
-                gap = 1
-            else:
-                gap = 2
-        else:
-            gap = self.sample_gap
-
         image_seq, zoom_x, zoom_y = self.load_image_sequence(
-            frames, tgt_idx, self.seq_length, gap
+            frames, tgt_idx, self.seq_length
         )
         tgt_drive, tgt_frame_id = frames[tgt_idx].split(" ")
         intrinsics = self.load_intrinsics(tgt_drive, tgt_frame_id)
         intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
 
-        pose = self.load_pose(tgt_drive, tgt_frame_id, gap)
+        pose = self.load_pose(tgt_drive, tgt_frame_id)
 
         example = {}
         example["intrinsics"] = intrinsics
@@ -107,21 +91,6 @@ class kitti_odom_pose_loader(object):
         example = self.load_example(self.train_frames, tgt_idx)
         return example
 
-    # def load_frame(self, drive, frame_id):
-    #     img = self.load_image(drive, frame_id)
-    #     try:
-    #         scale_x = np.float(self.img_width)/img.shape[1]
-    #     except:
-    #         print("KITTI loading error!")
-    #         print("Drive = ", drive)
-    #         print("frame_id = ", frame_id)
-    #         raise
-    #     scale_y = np.float(self.img_height)/img.shape[0]
-    #     intrinsics = self.load_intrinsics(drive, frame_id)
-    #     intrinsics = self.scale_intrinsics(intrinsics, scale_x, scale_y)
-    #     img = self.crop_resize(img)
-    #     return img, intrinsics
-
     def load_image(self, drive, frame_id):
         img_file = os.path.join(
             self.dataset_dir, "sequences", "%s/image_2/%s.png" % (drive, frame_id)
@@ -135,10 +104,10 @@ class kitti_odom_pose_loader(object):
         intrinsics = proj_c2p[:3, :3]
         return intrinsics
 
-    def load_pose(self, drive, tgt_frame_id, gap):
-        half_offset = int((self.seq_length - 1) / 2 * gap)
+    def load_pose(self, drive, tgt_frame_id):
+        half_offset = int((self.seq_length - 1) / 2)
         pose_seq = []
-        for o in range(-half_offset, half_offset + 1, gap):
+        for o in range(-half_offset, half_offset + 1):
             curr_idx = int(tgt_frame_id) + o
             # curr_pose = self.read_pose_file(drive, curr_idx)
             curr_pose_file = os.path.join(
@@ -150,27 +119,6 @@ class kitti_odom_pose_loader(object):
 
         pose = "".join(pose_seq)
         return pose
-
-    # def read_pose_file(self, drive, tgt_idx):
-    #     pose_file = os.path.join(self.dataset_dir, "poses", "%s.txt" % drive)
-    #     with open(pose_file, "r") as f:
-    #         poses = f.readlines()
-
-    #     tgt_pose = poses[tgt_idx][:-1] + " 0 0 0 1\n"
-    #     return tgt_pose
-
-    # def load_gt_odom(self, drive, tgt_idx, src_idx):
-    #     pose_file = os.path.join(self.dataset_dir, 'poses', '%s.txt' % drive)
-    #     with open(pose_file, 'r') as f:
-    #         poses = f.readlines()
-    #     filler = np.array([0, 0, 0, 1]).reshape((1,4))
-    #     tgt_pose = np.array(poses[int(tgt_idx)][:-1].split(' ')).astype(np.float32).reshape(3,4)
-    #     tgt_pose = np.concatenate((tgt_pose, filler), axis=0)
-    #     src_pose = np.array(poses[int(src_idx)][:-1].split(' ')).astype(np.float32).reshape(3,4)
-    #     src_pose = np.concatenate((src_pose, filler), axis=0)
-    #     rel_pose = np.dot(np.linalg.inv(src_pose), tgt_pose)
-    #     rel_6DOF = pose_mat_to_6dof(rel_pose)
-    #     return rel_6DOF
 
     def read_calib_file(self, filepath, cid=2):
         """Read in a calibration file and parse into a dictionary."""

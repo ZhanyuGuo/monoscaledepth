@@ -6,7 +6,7 @@ export CUDA_VISIBLE_DEVICES=1
 DATA_PATH=~/dataset/KITTI_RAW/
 
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_raw_20_0_multi_sup_new_7_frames
+MODEL_NAME=kitti_raw_20_0_multi_sup_new_7_frames_1
 DATASET=kitti_raw_pose
 
 # SPLIT=kitti_raw_pose

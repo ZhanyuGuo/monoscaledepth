@@ -51,7 +51,7 @@ class kitti_raw_pose_loader(object):
                         continue
                     for cam in self.cam_ids:
                         img_dir = os.path.join(drive_dir, "image_" + cam, "data")
-                        N = len(glob(img_dir + "/*.jpg"))   # very tiny mistake...
+                        N = len(glob(img_dir + "/*.jpg"))  # very tiny mistake...
                         for n in range(N):
                             frame_id = "%.10d" % n
                             # e.g. 2011_09_26_drive_0001_sync 02 0000000000
@@ -113,6 +113,8 @@ class kitti_raw_pose_loader(object):
         tgt_drive, tgt_cid, tgt_frame_id = frames[tgt_idx].split(" ")
         intrinsics = self.load_intrinsics_raw(tgt_drive, tgt_cid, tgt_frame_id)
         intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
+
+        # load pose
         pose = self.load_pose(tgt_drive, tgt_frame_id)
 
         example = {}

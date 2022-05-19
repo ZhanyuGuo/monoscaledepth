@@ -84,8 +84,10 @@ def main(args):
             point_cloud.append(ori)
 
     # output file
-    file_name = "scene.obj"
-    save_path = os.path.join(args.save_path, file_name)
+    directory, file_name = os.path.split(args.image_path)
+    output_name = os.path.splitext(file_name)[0]
+
+    save_path = os.path.join(args.save_path, output_name + ".obj")
     f = open(save_path, "w")
     for point in point_cloud:
         f.write("v")

@@ -368,6 +368,12 @@ def main(args):
             )
         )
 
+        print(
+            "min_depth_bin = {:.3f}, max_depth_bin = {:.3f}".format(
+                multi_encoder_dict["min_depth_bin"], multi_encoder_dict["max_depth_bin"]
+            )
+        )
+        
         directory, filename = os.path.split(args.target_image_path)
         output_name = os.path.splitext(filename)[0]
 

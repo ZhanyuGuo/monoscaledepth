@@ -19,12 +19,13 @@ class dominant_loader(object):
     ):
         self.dataset_dir = dataset_dir
         self.split = split
-
         self.sample_gap = sample_gap
         self.img_height = img_height
         self.img_width = img_width
-        self.seq_length = seq_length
+
         assert seq_length % 2 != 0, "seq_length must be odd!"
+        self.seq_length = seq_length
+
         self.frames = self.collect_frames(split)
         self.num_frames = len(self.frames)
         if split == "train":
@@ -35,6 +36,7 @@ class dominant_loader(object):
 
     def collect_frames(self, split):
         img_dir = self.dataset_dir + "raw_data/" + split + "/"
+        # img_dir = os.path.join(self.dataset_dir, "raw_data", split)
         folders = os.listdir(img_dir)
         frames = []
         for folder in folders:
@@ -124,7 +126,7 @@ class dominant_loader(object):
         intrinsics = self.load_intrinsics(tgt_frame_id, self.split)
         intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
         pose = self.load_pose(tgt_frame_id, gap)
-        
+
         example = {}
         example["intrinsics"] = intrinsics
         example["image_seq"] = image_seq

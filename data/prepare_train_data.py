@@ -102,7 +102,6 @@ def main():
             img_height=args.img_height,
             img_width=args.img_width,
             seq_length=args.seq_length,
-            sample_gap=args.sample_gap,
         )
 
     if args.dataset_name == "kitti_raw_eigen":

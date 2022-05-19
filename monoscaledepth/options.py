@@ -44,8 +44,9 @@ class MonoscaledepthOptions:
                 "kitti_raw_pose",
                 "eigen_zhou",
                 "odom",
+                "dominant",
             ],
-            default="kitti_raw_pose",
+            default="eigen_zhou",
         )
         self.parser.add_argument(
             "--num_layers",
@@ -105,6 +106,7 @@ class MonoscaledepthOptions:
                 "kitti_raw_pose",
                 "kitti_raw_pose_semantic",
                 "kitti_odom_pose",
+                "dominant_pose",
             ],
         )
         self.parser.add_argument(

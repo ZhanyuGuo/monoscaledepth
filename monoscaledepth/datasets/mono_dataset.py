@@ -145,7 +145,7 @@ class MonoDataset(data.Dataset):
         # poses = {}
         if type(self).__name__ in [
             # "KITTIRawPoseDataset",
-            "",
+            "DominantDataset",
         ]:
             inputs.update(self.get_colors(folder, frame_index, side, do_flip))
         else:
