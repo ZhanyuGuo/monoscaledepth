@@ -1,6 +1,6 @@
 # This script is to train the model with multi depth and with pose supervised.
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 DATA_PATH=~/dataset/KITTI_RAW/
 LOG_PATH=~/checkpoint/

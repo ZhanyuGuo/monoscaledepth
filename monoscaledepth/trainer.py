@@ -314,8 +314,8 @@ class Trainer:
             self.model_optimizer.step()
 
             duration = time.time() - before_op_time
-            early_phase = batch_idx % self.opt.log_frequency == 0 and self.step < 100  # 2000
-            late_phase = self.step % 100 == 0
+            early_phase = batch_idx % self.opt.log_frequency == 0 and self.step < 2000  # 2000
+            late_phase = self.step % 2000 == 0
 
             if early_phase or late_phase:
                 self.log_time(

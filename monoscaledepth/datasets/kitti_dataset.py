@@ -163,10 +163,10 @@ class KITTIRawPoseSemanticDataset(KITTIRawPoseDataset):
         )
         masks = masks.squeeze(0)
 
-        # # method 1: Or all the masks.
+        # method 1: or all the masks.
         # masks = masks.sum(dim=0, keepdim=True) > 0
 
-        # method 2: TODO fill with zeros up to `max_instances`
+        # method 2: fill with zeros up to `max_instances`
         zeros = torch.zeros((max_instances, h, w))
         masks = torch.cat([masks, zeros], dim=0)
         masks = masks[:max_instances]

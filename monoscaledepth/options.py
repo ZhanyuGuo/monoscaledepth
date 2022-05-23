@@ -134,15 +134,13 @@ class MonoscaledepthOptions:
         self.parser.add_argument(
             "--freeze_teacher_and_pose",
             action="store_true",
-            help="If set, freeze the weights of the single frame teacher"
-            " network and pose network.",
+            help="If set, freeze the weights of the single frame network and pose network.",
         )
         self.parser.add_argument(
             "--freeze_teacher_epoch",
             type=int,
             default=15,
-            help="Sets the epoch number at which to freeze the teacher"
-            "network and the pose network.",
+            help="Sets the epoch number at which to freeze the teacher network and the pose network.",
         )
 
         # ABLATION options
@@ -169,7 +167,7 @@ class MonoscaledepthOptions:
         self.parser.add_argument(
             "--begin_supervise_epoch",
             type=int,
-            default=10,
+            default=0,
             help="Sets the epoch number at which to begin the pose supervise.",
         )
         self.parser.add_argument(
@@ -191,15 +189,13 @@ class MonoscaledepthOptions:
         )
         self.parser.add_argument(
             "--disable_motion_masking",
-            help="If set, will not apply consistency loss in regions where"
-            "the cost volume is deemed untrustworthy",
+            help="If set, will not apply consistency loss in regions where the cost volume is deemed untrustworthy",
             action="store_true",
         )
         self.parser.add_argument(
             "--no_matching_augmentation",
             action="store_true",
-            help="If set, will not apply static camera augmentation or "
-            "zero cost volume augmentation during training",
+            help="If set, will not apply static camera augmentation or zero cost volume augmentation during training",
         )
         self.parser.add_argument(
             "--no_multi_depth",
@@ -291,8 +287,7 @@ class MonoscaledepthOptions:
         )
         self.parser.add_argument(
             "--eval_eigen_to_benchmark",
-            help="if set assume we are loading eigen results from npy but "
-            "we want to evaluate using the new benchmark.",
+            help="if set assume we are loading eigen results from npy but we want to evaluate using the new benchmark.",
             action="store_true",
         )
         self.parser.add_argument(
