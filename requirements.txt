@@ -1,0 +1,5 @@
+opencv-python
+matplotlib
+tensorboardX==1.5
+scikit-image==0.16.2
+tqdm==4.57.0

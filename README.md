@@ -4,16 +4,39 @@
 
 - Change your anaconda's channels to get the best download speed.
 
-- Configure the environment.
+  ```bash
+  conda config --show-sources
+  
+  conda config --add https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/
+  conda config --add https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/
+  conda config --add https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/
+  conda config --add https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
+  
+  conda config --set show_channel_urls yes
+  ```
+
+- Create an environment.
 
   ```bash
-  conda env create -f environment.yml
+  conda create --name monoscaledepth python=3.6
   ```
 
 - Activate the environment.
 
   ```bash
   conda activate monoscaledepth
+  ```
+
+- Install PyTorch
+
+  ```bash
+  conda install pytorch=1.7.1 torchvision
+  ```
+
+- Install other dependencies.
+
+  ```bash
+  pip install -r requirements.txt
   ```
 
 ## Dataset

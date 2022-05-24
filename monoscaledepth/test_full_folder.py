@@ -11,6 +11,7 @@
 
 import os
 import json
+import time
 import torch
 import torch.nn.functional as F
 import argparse
@@ -59,6 +60,12 @@ def parse_args():
         help="path to output images",
         required=True,
     )
+    parser.add_argument(
+        "--no_cuda",
+        action="store_true",
+        help="use cpu.",
+    )
+
     return parser.parse_args()
 
 
@@ -67,7 +74,7 @@ def load_and_preprocess_image(image_path, resize_width, resize_height):
     original_width, original_height = image.size
     image = image.resize((resize_width, resize_height), pil.LANCZOS)
     image = transforms.ToTensor()(image).unsqueeze(0)
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and not args.no_cuda:
         return image.cuda(), (original_height, original_width)
     return image, (original_height, original_width)
 
@@ -87,7 +94,7 @@ def load_and_preprocess_intrinsics(intrinsics_path, resize_width, resize_height)
 
         invK = torch.Tensor(np.linalg.pinv(K)).unsqueeze(0)
         K = torch.Tensor(K).unsqueeze(0)
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and not args.no_cuda:
             K = K.cuda()
             invK = invK.cuda()
 
@@ -149,8 +156,14 @@ def compute_matching_mask(outputs, device):
     return mask[:, 0]
 
 
-def main(args):
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+def main():
+    device = (
+        torch.device("cuda")
+        if torch.cuda.is_available() and not args.no_cuda
+        else torch.device("cpu")
+    )
+    print("Using {}.".format(device))
+
     print("-> Loading model from ", args.model_path)
 
     print("-> Loading mono encoder")
@@ -223,7 +236,7 @@ def main(args):
     multi_decoder.eval()
     pose_encoder.eval()
     pose_decoder.eval()
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and not args.no_cuda:
         mono_encoder.cuda()
         mono_decoder.cuda()
         multi_encoder.cuda()
@@ -243,8 +256,9 @@ def main(args):
         resize_height=multi_encoder_dict["height"],
     )
     print("num_image: ", num_image)
+    dur = 0
     for i in range(num_image - 1):
-        print("processing {}/{} ...".format(i + 1, num_image))
+        print("processing {}/{} ... {}s".format(i + 1, num_image, dur))
         source_image_path = input_name.format(i)
         target_image_path = input_name.format(i + 1)
 
@@ -258,15 +272,8 @@ def main(args):
             resize_width=multi_encoder_dict["width"],
             resize_height=multi_encoder_dict["height"],
         )
-
         with torch.no_grad():
-            # Mono depth
-            mono_output = mono_encoder(target_image)
-            mono_output = mono_decoder(mono_output)
-            mono_sigmoid_output = mono_output[("disp", 0)]
-            mono_sigmoid_output, mono_depth = disp_to_depth(
-                mono_sigmoid_output, 0.1, 100
-            )
+            start = time.time()
 
             # Pose
             pose_inputs = [source_image, target_image]
@@ -291,6 +298,16 @@ def main(args):
             multi_sigmoid_output = multi_output[("disp", 0)]
             multi_sigmoid_output, multi_depth = disp_to_depth(
                 multi_sigmoid_output, 0.1, 100
+            )
+
+            dur += time.time() - start
+
+            # Mono depth
+            mono_output = mono_encoder(target_image)
+            mono_output = mono_decoder(mono_output)
+            mono_sigmoid_output = mono_output[("disp", 0)]
+            mono_sigmoid_output, mono_depth = disp_to_depth(
+                mono_sigmoid_output, 0.1, 100
             )
 
             mono_sigmoid_output_resized = torch.nn.functional.interpolate(
@@ -339,8 +356,10 @@ def main(args):
             )
             im.save(name_dest_im)
             # print("-> Saved output image to {}".format(name_dest_im))
+            
+    print("fps: {}.".format(num_image / dur))
 
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args)
+    main()
