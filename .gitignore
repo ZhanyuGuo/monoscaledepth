@@ -137,8 +137,7 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# *.npz
-# *.npy
-# assets/*.obj
-# assets/*.jpeg
-# visualization/*.obj
+*.npz
+*.npy
+*.obj
+assets/*.jpeg

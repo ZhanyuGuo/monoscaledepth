@@ -51,6 +51,12 @@
   ```
 
 ## Evaluation
+- Export ground-truth depth from dataset.
+  ```bash
+  python -m monoscaledepth.export_gt_depth \
+      --data_path ~/dataset/KITTI_RAW/ \
+      --split eigen
+  ```
 
 - Qualitative.
 
