@@ -2,14 +2,23 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
-TARGET_IMG_PATH=assets/10563.jpg
-SOURCE_IMG_PATH=assets/10562.jpg
+# TARGET_IMG_PATH=assets/10563.jpg
+# SOURCE_IMG_PATH=assets/10562.jpg
 
 # TARGET_IMG_PATH=assets/10764.jpg
 # SOURCE_IMG_PATH=assets/10763.jpg
 
 # TARGET_IMG_PATH=assets/10902.jpg
 # SOURCE_IMG_PATH=assets/10901.jpg
+
+# TARGET_IMG_PATH=assets/0000000018.jpg
+# SOURCE_IMG_PATH=assets/0000000017.jpg
+
+TARGET_IMG_PATH=assets/0000000019.jpg
+SOURCE_IMG_PATH=assets/0000000018.jpg
+
+# TARGET_IMG_PATH=assets/0000000099.jpg
+# SOURCE_IMG_PATH=assets/0000000098.jpg
 
 INTRINSICS=assets/dominant_intrinsics.json
 

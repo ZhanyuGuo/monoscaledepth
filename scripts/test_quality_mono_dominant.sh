@@ -6,9 +6,15 @@ export CUDA_VISIBLE_DEVICES=0
 
 # TARGET_IMG_PATH=assets/10764.jpg
 
-TARGET_IMG_PATH=assets/10902.jpg
+# TARGET_IMG_PATH=assets/10902.jpg
 
-MODEL_PATH=~/checkpoint/dominant_mono_sup_50_0/models/weights_49/
+# TARGET_IMG_PATH=assets/0000000018.jpg
+
+TARGET_IMG_PATH=assets/0000000019.jpg
+
+# TARGET_IMG_PATH=assets/0000000099.jpg
+
+MODEL_PATH=~/checkpoint/dominant_mono_sup_50_1/models/weights_49/
 
 python -m monoscaledepth.test_simple \
     --target_image_path $TARGET_IMG_PATH \
