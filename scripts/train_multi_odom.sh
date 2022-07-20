@@ -3,18 +3,17 @@
 export CUDA_VISIBLE_DEVICES=1
 
 DATA_PATH=~/dataset/KITTI_ODOM/dataset
-
 LOG_PATH=~/checkpoint/
-MODEL_NAME=kitti_odom_20_multi_new
+MODEL_NAME=kitti_odom_multi_20
 DATASET=kitti_odom_pose
-
 SPLIT=odom
 
 EPOCHS=20
 STEP_SIZE=15
 FREEZE_EPOCHS=15
 SAVE_FREQUENCY=1
-BATCH_SIZE=10
+BATCH_SIZE=8
+SEED=612
 
 python -m monoscaledepth.train \
    --data_path $DATA_PATH \
@@ -27,3 +26,4 @@ python -m monoscaledepth.train \
    --scheduler_step_size $STEP_SIZE \
    --freeze_teacher_epoch $FREEZE_EPOCHS \
    --save_frequency $SAVE_FREQUENCY \
+   --pytorch_random_seed $SEED \

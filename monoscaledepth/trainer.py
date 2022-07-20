@@ -5,16 +5,17 @@
 # available in the LICENSE file.
 
 import os
+from tabnanny import verbose
 
 os.environ["MKL_NUM_THREADS"] = "1"  # noqa F402
 os.environ["NUMEXPR_NUM_THREADS"] = "1"  # noqa F402
 os.environ["OMP_NUM_THREADS"] = "1"  # noqa F402
 
-import numpy as np
 import time
-import random
 import json
-
+import random
+import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
@@ -31,16 +32,22 @@ from .layers import (
     get_smooth_loss,
 )
 
-from monoscaledepth import datasets, networks
-import matplotlib.pyplot as plt
+from . import datasets, networks
 
 
 _DEPTH_COLORMAP = plt.get_cmap("plasma", 256)
 
 
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % (2 ** 32)
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+
 class Trainer:
     def __init__(self, options):
         self.opt = options
+
         self.log_path = os.path.join(self.opt.log_dir, self.opt.model_name)
 
         # checking height and width are multiples of 32, e.g. 640x192
@@ -73,7 +80,7 @@ class Trainer:
                 if idx not in frames_to_load:
                     frames_to_load.append(idx)
 
-        print("Loading frames: {}".format(frames_to_load))
+        print("Loading frames:", frames_to_load)
 
         self.pose_supervise = False
 
@@ -145,7 +152,7 @@ class Trainer:
             self.parameters_to_train, self.opt.learning_rate
         )
         self.model_lr_scheduler = optim.lr_scheduler.StepLR(
-            self.model_optimizer, self.opt.scheduler_step_size, 0.1
+            self.model_optimizer, self.opt.scheduler_step_size, 0.1, verbose=True
         )
 
         if self.opt.load_weights_folder is not None:
@@ -154,16 +161,18 @@ class Trainer:
         if self.opt.mono_weights_folder is not None:
             self.load_mono_model()
 
-        print("Training model named:\n", self.opt.model_name)
-        print("Models and tensorboard events files are saved to:\n", self.opt.log_dir)
-        print("Training is using:\n", self.device)
+        print("Training model named:", self.opt.model_name)
+        print("Models and tensorboard events files are saved to:", self.opt.log_dir)
+        print("Training is using:", self.device)
 
         # DATA
         datasets_dict = {
+            "kitti_raw": datasets.KITTIRAWDataset,
             "kitti_raw_pose": datasets.KITTIRawPoseDataset,
             "kitti_raw_pose_semantic": datasets.KITTIRawPoseSemanticDataset,
+            "kitti_odom": datasets.KITTIOdomDataset,
             "kitti_odom_pose": datasets.KITTIOdomPoseDataset,
-            "dominant_pose": datasets.DominantDataset,
+            # "dominant_pose": datasets.DominantDataset,
         }
         self.dataset = datasets_dict[self.opt.dataset]
 
@@ -173,6 +182,7 @@ class Trainer:
         img_ext = ".png" if self.opt.png else ".jpg"
 
         num_train_samples = len(train_filenames)
+
         # fmt: off
         self.num_total_steps = num_train_samples // self.opt.batch_size * self.opt.num_epochs
         # fmt: on
@@ -194,6 +204,7 @@ class Trainer:
             num_workers=self.opt.num_workers,
             pin_memory=True,
             drop_last=True,
+            worker_init_fn=seed_worker,
         )
         val_dataset = self.dataset(
             data_path=self.opt.data_path,
@@ -246,7 +257,7 @@ class Trainer:
             "da/a3",
         ]
 
-        print("Using split:\n", self.opt.split)
+        print("Using split:", self.opt.split)
         print(
             "There are {:d} training items and {:d} validation items\n".format(
                 len(train_dataset), len(val_dataset)
@@ -272,31 +283,36 @@ class Trainer:
                 self.epoch == self.opt.freeze_teacher_epoch
                 and not self.opt.no_multi_depth
             ):
-                self.train_teacher_and_pose = False
-                self.pose_supervise = False
-                print("freezing teacher and pose networks!")
-
-                # here we reinitialise our optimizer to ensure there are no updates to the
-                # teacher and pose networks
-                self.parameters_to_train = []
-                self.parameters_to_train += list(self.models["encoder"].parameters())
-                self.parameters_to_train += list(self.models["depth"].parameters())
-                self.model_optimizer = optim.Adam(
-                    self.parameters_to_train, self.opt.learning_rate
-                )
-
-                ## Q: Reset the scheduler and maybe no lr decay in the whole training?
-                ## A: NO. After re-initializing, it resets the steps(epochs).
-                ## Solved.
-                self.model_lr_scheduler = optim.lr_scheduler.StepLR(
-                    self.model_optimizer, self.opt.scheduler_step_size, 0.1
-                )
-                for _ in range(self.epoch):
-                    self.model_lr_scheduler.step()
+                self.freeze_teacher()
 
             self.run_epoch()
             if (self.epoch + 1) % self.opt.save_frequency == 0:
                 self.save_model()
+
+    def freeze_teacher(self):
+        if self.train_teacher_and_pose:
+            self.train_teacher_and_pose = False
+            print("freezing teacher and pose networks!")
+
+            # here we reinitialise our optimizer to ensure there are no updates to the
+            # teacher and pose networks
+            self.parameters_to_train = []
+            self.parameters_to_train += list(self.models["encoder"].parameters())
+            self.parameters_to_train += list(self.models["depth"].parameters())
+            self.model_optimizer = optim.Adam(
+                self.parameters_to_train, self.opt.learning_rate
+            )
+            self.model_lr_scheduler = optim.lr_scheduler.StepLR(
+                self.model_optimizer, self.opt.scheduler_step_size, 0.1, verbose=True
+            )
+            # ensure the scheduler having the right step
+            for _ in range(self.epoch):
+                self.model_lr_scheduler.step()
+
+            # set eval so that teacher + pose batch norm is running average
+            self.set_eval()
+            # set train so that multi batch norm is in train mode
+            self.set_train()
 
     def run_epoch(self):
         """Run a single epoch of training and validation"""
@@ -314,7 +330,7 @@ class Trainer:
             self.model_optimizer.step()
 
             duration = time.time() - before_op_time
-            early_phase = batch_idx % self.opt.log_frequency == 0 and self.step < 2000  # 2000
+            early_phase = batch_idx % self.opt.log_frequency == 0 and self.step < 2000
             late_phase = self.step % 2000 == 0
 
             if early_phase or late_phase:
@@ -322,6 +338,7 @@ class Trainer:
                     batch_idx,
                     duration,
                     losses["loss"].cpu().data,
+                    losses["pose"].cpu().data,
                 )
 
                 self.log("train", inputs, outputs, losses)
@@ -450,7 +467,7 @@ class Trainer:
         if self.pose_supervise:
             pose_losses = self.compute_pose_losses(inputs, outputs)
         else:
-            pose_losses = torch.tensor(0)
+            pose_losses = torch.tensor(0, device=self.device)
 
         losses["pose"] = pose_losses
         losses["loss"] += self.opt.pose_weight * losses["pose"]
@@ -503,6 +520,7 @@ class Trainer:
                 outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
                     axisangle[:, 0], translation[:, 0], invert=(f_i < 0)
                 )
+
             if not self.opt.no_multi_depth:
                 # now we need poses for matching - compute without gradients
                 pose_feats = {
@@ -689,7 +707,7 @@ class Trainer:
                     # ---- 2 ----
                     threshold = 0.5
                     max_instances = 5
-                    
+
                     semantic_masks = inputs[("semantic_mask", 0)]  # b x c x h x w
                     con_and_sem = consistency_mask * semantic_masks
                     and_sum = con_and_sem.sum(dim=[2, 3])
@@ -704,7 +722,6 @@ class Trainer:
                                 consistency_mask[batch_idx] = consistency_mask[batch_idx] * (1 - semantic_masks[batch_idx, mask_idx : mask_idx + 1])
                     # fmt: on
                     reprojection_loss_mask = 1 - consistency_mask
-                    pass
 
             reprojection_loss = reprojection_loss * reprojection_loss_mask
             reprojection_loss = reprojection_loss.sum() / (
@@ -892,7 +909,7 @@ class Trainer:
                         "consistency_target/{}".format(j), consistency_target, self.step
                     )
 
-    def log_time(self, batch_idx, duration, loss):
+    def log_time(self, batch_idx, duration, loss, pose):
         """Print a logging statement to the terminal"""
 
         samples_per_sec = self.opt.batch_size / duration
@@ -904,7 +921,7 @@ class Trainer:
         )
         print_string = (
             "epoch {:>3} | batch {:>6} | examples/s: {:5.1f}"
-            + " | loss: {:.5f} | time elapsed: {} | time left: {}"
+            + " | loss: {:.5f} | pose: {:.5f} | time elapsed: {} | time left: {}"
         )
         print(
             print_string.format(
@@ -912,6 +929,7 @@ class Trainer:
                 batch_idx,
                 samples_per_sec,
                 loss,
+                pose,
                 sec_to_hm_str(time_sofar),
                 sec_to_hm_str(training_time_left),
             )
@@ -1005,8 +1023,16 @@ class Trainer:
     def set_train(self):
         """Convert all models to training mode"""
 
-        for m in self.models.values():
-            m.train()
+        # for m in self.models.values():
+        #     m.train()
+        for k, m in self.models.items():
+            if self.train_teacher_and_pose:
+                m.train()
+            else:
+                # if teacher + pose is frozen, then only use training batch norm stats for
+                # multi components
+                if k in ["depth", "encoder"]:
+                    m.train()
 
     def set_eval(self):
         """Convert all models to testing/evaluation mode"""

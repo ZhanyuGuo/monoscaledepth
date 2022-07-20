@@ -111,20 +111,13 @@ class KITTIRAWDataset(KITTIDataset):
         return depth_gt
 
 
-class KITTIRawPoseDataset(KITTIDataset):
+class KITTIRawPoseDataset(KITTIRAWDataset):
     """KITTI dataset with gt_pose for training and testing"""
 
     def __init__(self, *args, **kwargs):
         super(KITTIRawPoseDataset, self).__init__(*args, **kwargs)
 
         self.load_pose = True
-
-    def get_image_path(self, folder, frame_index, side):
-        f_str = "{:010d}{}".format(frame_index, self.img_ext)
-        image_path = os.path.join(
-            self.data_path, folder, "image_0{}/data".format(self.side_map[side]), f_str
-        )
-        return image_path
 
     def get_pose(self, folder, frame_index):
         f_str = "{:010d}.txt".format(frame_index)
@@ -191,23 +184,13 @@ class KITTIOdomDataset(KITTIDataset):
         return image_path
 
 
-class KITTIOdomPoseDataset(KITTIDataset):
+class KITTIOdomPoseDataset(KITTIOdomDataset):
     """KITTI dataset for odometry with gt_pose for training and testing"""
 
     def __init__(self, *args, **kwargs):
         super(KITTIOdomPoseDataset, self).__init__(*args, **kwargs)
 
         self.load_pose = True
-
-    def get_image_path(self, folder, frame_index, side):
-        f_str = "{:06d}{}".format(frame_index, self.img_ext)
-        image_path = os.path.join(
-            self.data_path,
-            "sequences/{:02d}".format(int(folder)),
-            "image_{}".format(self.side_map[side]),
-            f_str,
-        )
-        return image_path
 
     def get_pose(self, folder, frame_index):
         pose_file = os.path.join(

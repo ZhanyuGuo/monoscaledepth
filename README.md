@@ -1,8 +1,10 @@
 # README
 
+**This work is based on [manydepth](https://www.github.com/nianticlabs/manydepth).**
+
 ## Environment
 
-- Change your anaconda's channels to get the best download speed.
+- Change your anaconda's channels to get the best download 
 
   ```bash
   conda config --show-sources
@@ -49,6 +51,7 @@
 ## Prepare Data
 
 - If you use KITTI Dataset above, just unzip them anywhere but keep their file structure.
+  - Extract the gt pose by `data/kitti/export_pose_raw.py`.
 - If you use Custom Dataset.
   - (optional) Transform from video to images with specified size, i.e. 640x192. (data/video_to_image.py & data/copy_rename_data.py)
   - Concatenate k(e.g. 3) continuous images into one image. (data/prepare_train_data.py or scripts/prepare_dominant.sh)

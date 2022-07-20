@@ -107,7 +107,7 @@ class ResnetEncoderMatching(nn.Module):
         self.is_cuda = False
         self.warp_depths = None
         self.depth_bins = None
-        
+
         resnets = {
             18: models.resnet18,
             34: models.resnet34,
@@ -164,22 +164,17 @@ class ResnetEncoderMatching(nn.Module):
         self.depth_binning, to either be linear in depth (linear) or linear in inverse depth
         (inverse)"""
 
+        # fmt: off
         if self.depth_binning == "inverse":
-            # fmt: off
-            self.depth_bins = (
-                1 / np.linspace(1 / max_depth_bin, 1 / min_depth_bin, self.num_depth_bins)[::-1]
-            )
-            # fmt: on
+            self.depth_bins = (1 / np.linspace(1 / max_depth_bin, 1 / min_depth_bin, self.num_depth_bins)[::-1])
         elif self.depth_binning == "linear":
-            self.depth_bins = np.linspace(
-                min_depth_bin, max_depth_bin, self.num_depth_bins
-            )
+            self.depth_bins = np.linspace(min_depth_bin, max_depth_bin, self.num_depth_bins)
         else:
             raise NotImplementedError
-
-        self.depth_bins = torch.from_numpy(self.depth_bins).float()
+        # fmt: on
 
         self.warp_depths = []
+        self.depth_bins = torch.from_numpy(self.depth_bins).float()
         for depth in self.depth_bins:
             depth = torch.ones((1, self.matching_height, self.matching_width)) * depth
             self.warp_depths.append(depth)

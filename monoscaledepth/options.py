@@ -20,7 +20,7 @@ class MonoscaledepthOptions:
             "--data_path",
             type=str,
             help="path to the training data",
-            default=os.path.join(file_dir, "kitti_dataset"),
+            default=os.path.join(os.path.expanduser("~"), "kitti_dataset"),
         )
         self.parser.add_argument(
             "--log_dir",
@@ -52,8 +52,8 @@ class MonoscaledepthOptions:
             "--num_layers",
             type=int,
             help="number of resnet layers",
-            default=18,
             choices=[18, 34, 50, 101, 152],
+            default=18,
         )
         self.parser.add_argument(
             "--depth_binning",
@@ -101,13 +101,15 @@ class MonoscaledepthOptions:
             "--dataset",
             type=str,
             help="dataset to train on",
-            default="kitti_raw_pose",
             choices=[
+                "kitti_raw",
                 "kitti_raw_pose",
                 "kitti_raw_pose_semantic",
+                "kitti_odom",
                 "kitti_odom_pose",
                 "dominant_pose",
             ],
+            default="kitti_raw_pose",
         )
         self.parser.add_argument(
             "--png",
@@ -142,14 +144,15 @@ class MonoscaledepthOptions:
             default=15,
             help="Sets the epoch number at which to freeze the teacher network and the pose network.",
         )
+        self.parser.add_argument("--pytorch_random_seed", default=None, type=int)
 
         # ABLATION options
         self.parser.add_argument(
             "--weights_init",
             type=str,
             help="pretrained or scratch",
-            default="pretrained",
             choices=["pretrained", "scratch"],
+            default="pretrained",
         )
         self.parser.add_argument(
             "--no_ssim", help="if set, disables ssim in the loss", action="store_true"
